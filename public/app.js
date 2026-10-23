@@ -25,6 +25,8 @@ const icons = {
   review: "▦",
   editor: "▧",
   workflows: "⌘",
+  intake: "↳",
+  monitors: "◉",
   skills: "◇",
   tasks: "☷",
   integrations: "⇄",
@@ -94,6 +96,7 @@ function go(next) {
 }
 function render() {
   window.CounselCollab?.detach();
+  clearTimeout(workflowPoll);
   const nav = [
     ["home", "Home"],
     ["assistant", "Assistant"],
@@ -102,6 +105,8 @@ function render() {
     ["review", "Tabular review"],
     ["editor", "Editor"],
     ["workflows", "Workflows"],
+    ["intake", "Intake"],
+    ["monitors", "Monitors"],
     ["skills", "Skills"],
     ["tasks", "Lists"],
     ...(authState?.user?.role === "owner"
@@ -228,39 +233,48 @@ function content() {
           "Draft together, refine your findings, and export to Word.",
           '<button class="primary" onclick="newDraft()">＋ New draft</button>',
         ) +
-        `<div class="toolbar">${selector()}${d ? `<select id="draft-select" aria-label="Select draft">${drafts.map((x) => `<option value="${x.id}" ${x.id === d.id ? "selected" : ""}>${esc(x.title)}</option>`).join("")}</select><button class="secondary" onclick="saveDraft('${d.id}')">Save title</button><a class="primary" href="/api/drafts/${d.id}/export">↓ Export Word</a>` : ""}</div>${d ? `<div class="editorpaper"><input id="draft-title" value="${esc(d.title)}" aria-label="Draft title"><div class="rich-actions"><button class="secondary" onclick="draftComments('${d.id}')">Comments</button><button class="secondary" onclick="draftHistory('${d.id}')">History</button><button class="secondary" onclick="CounselCollab.undo()">↶ Undo</button><button class="secondary" onclick="CounselCollab.redo()">↷ Redo</button></div><div id="draft-content"></div><small id="collaboration-status">Connecting to shared draft…</small></div>` : empty("▧", "Room for your next great argument.", "Create a draft from your matter documents.", "Create draft", "newDraft()")}`
+        `<div class="toolbar">${selector()}${d ? `<select id="draft-select" aria-label="Select draft">${drafts.map((x) => `<option value="${x.id}" ${x.id === d.id ? "selected" : ""}>${esc(x.title)}</option>`).join("")}</select><button class="secondary" onclick="saveDraft('${d.id}')">Save title</button><a class="primary" href="/api/drafts/${d.id}/export">↓ Export Word</a>` : ""}</div>${d ? `<div class="editorpaper"><input id="draft-title" value="${esc(d.title)}" aria-label="Draft title"><div class="rich-actions"><button class="secondary" onclick="draftSuggestions('${d.id}')">Proposed edits</button><button class="secondary" onclick="draftComments('${d.id}')">Comments</button><button class="secondary" onclick="draftHistory('${d.id}')">History</button><button class="secondary" onclick="CounselCollab.undo()">↶ Undo</button><button class="secondary" onclick="CounselCollab.redo()">↷ Redo</button></div><div id="draft-content"></div><small id="collaboration-status">Connecting to shared draft…</small></div>` : empty("▧", "Room for your next great argument.", "Create a draft from your matter documents.", "Create draft", "newDraft()")}`
       );
     }
     case "workflows":
+    case "intake":
+    case "monitors": {
+      const titles = {
+          workflows: [
+            "REPEAT YOUR BEST WORK",
+            "Workflows",
+            "Run your process from evidence to approved work product.",
+            "editWorkflow()",
+            "＋ Create workflow",
+          ],
+          intake: [
+            "KEEP REQUESTS ACCOUNTABLE",
+            "Intake",
+            "Give every legal request an owner and an approved resolution.",
+            "newIntake()",
+            "＋ New request",
+          ],
+          monitors: [
+            "KEEP UP WITH YOUR MATTER",
+            "Monitors",
+            "Turn new document evidence into follow-up work.",
+            "newMonitor()",
+            "＋ Create monitor",
+          ],
+        },
+        t = titles[view];
       return (
         heading(
-          "REPEAT YOUR BEST WORK",
-          "Workflows",
-          "A consistent starting point for the work you do every day.",
+          t[0],
+          t[1],
+          t[2],
+          editable()
+            ? `<button class="primary" onclick="${t[3]}">${t[4]}</button>`
+            : "",
         ) +
-        `<div class="toolbar">${selector()}</div><div class="workflow-grid">${[
-          [
-            "Contract diligence",
-            "Review governing law, liability, assignment and termination.",
-            "contract",
-          ],
-          [
-            "NDA first pass",
-            "Compare confidentiality obligations, term and permitted disclosures.",
-            "nda",
-          ],
-          [
-            "Matter briefing",
-            "Compile evidence into an editable review memorandum.",
-            "brief",
-          ],
-        ]
-          .map(
-            ([title, description, key]) =>
-              `<article class="workflow-card"><div class="workflow-icon">⌘</div><span class="pill">Workspace template</span><h2>${title}</h2><p>${description}</p><div class="workflow-steps"><span>Documents</span> → <span>Analyze</span> → <span>Review</span></div><footer><small>Reusable workflow</small><button class="primary" onclick="runWorkflow('${key}')">Run workflow ↗</button></footer></article>`,
-          )
-          .join("")}</div>`
+        `<div class="toolbar">${selector()}<button class="secondary" onclick="loadWorkflowViews()">Refresh</button></div><div id="workflow-content">Loading…</div>`
       );
+    }
     case "skills":
       return (
         heading(
@@ -269,7 +283,7 @@ function content() {
           "Bring your standards into every conversation.",
           '<button class="primary" onclick="newSkill()">＋ Create skill</button>',
         ) +
-        `<div class="workflow-grid">${S.skills.map((s) => `<article class="workflow-card"><div class="workflow-icon">◇</div><span class="pill">${esc(s.category)}</span><h2>${esc(s.name)}</h2><p>${esc(s.instructions)}</p><button class="textbutton" onclick="go('assistant');$('#skill-select').value='${s.id}'">Use in Assistant →</button></article>`).join("")}</div>`
+        `<div class="workflow-grid">${S.skills.map((s) => `<article class="workflow-card"><div class="workflow-icon">◇</div><span class="pill">${esc(s.category)} · v${s.version || 1}</span><h2>${esc(s.name)}</h2><p>${esc(s.instructions)}</p><button class="textbutton" onclick="go('assistant');$('#skill-select').value='${s.id}'">Use in Assistant →</button><div class="rich-actions">${editable() ? `<button class="secondary" onclick="editSkill('${s.id}')">Edit skill</button>` : ""}<button class="secondary" onclick="skillHistory('${s.id}')">Version history</button></div></article>`).join("")}</div>`
       );
     case "tasks":
       return (
@@ -527,48 +541,6 @@ function exportReview(id) {
     "text/csv",
   );
 }
-async function runWorkflow(k) {
-  if (!docs().length) return toast("Upload documents first.");
-  try {
-    toast("Running workflow…");
-    if (k === "brief") {
-      const d = await api("drafts", {
-        matterId,
-        title: "Matter briefing",
-        prompt:
-          "Summarize governing law, liability, assignment and termination",
-      });
-      activeDraft = d.id;
-      view = "editor";
-    } else {
-      const r = await api("reviews", {
-        matterId,
-        name: k === "nda" ? "NDA first pass" : "Contract diligence",
-        columns:
-          k === "nda"
-            ? [
-                "Confidential information",
-                "Term and duration",
-                "Permitted disclosures",
-                "Assignment",
-              ]
-            : [
-                "Governing law",
-                "Liability cap",
-                "Assignment restrictions",
-                "Termination",
-              ],
-      });
-      activeReview = r.id;
-      view = "review";
-    }
-    await refresh();
-    render();
-    toast("Workflow complete");
-  } catch (e) {
-    toast(e.message);
-  }
-}
 async function send(query, skillId) {
   if (busy || !query.trim()) return;
   if (!matterId) return toast("Create a matter first.");
@@ -590,6 +562,7 @@ function uploadDocuments() {
   $("#upload")?.click();
 }
 function bind() {
+  if (["workflows", "intake", "monitors"].includes(view)) loadWorkflowViews();
   if (view === "integrations") loadConnectors();
   if (view === "editor" && $("#draft-content")) {
     const drafts = S.drafts.filter((d) => d.matterId === matterId),

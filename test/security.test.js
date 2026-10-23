@@ -8,7 +8,7 @@ process.env.COUNSEL_DB = ":memory:";
 process.env.DATA_DIR = fs.mkdtempSync(
   path.join(os.tmpdir(), "counsel-security-"),
 );
-const { app, db, jobs } = require("../server");
+const { app, db, jobs, workflows } = require("../server");
 const argon2 = require("argon2");
 test("authentication, workspace boundaries, roles, CSRF, validation and revocation", async (t) => {
   const server = app.listen(0, "127.0.0.1");
@@ -342,7 +342,8 @@ test("authentication, workspace boundaries, roles, CSRF, validation and revocati
     });
   } finally {
     await new Promise((r) => server.close(r));
-    jobs.close();
+    await jobs.close();
+    await workflows.close();
     db.close();
     fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true });
   }

@@ -228,6 +228,38 @@ function createCollaboration(db, security, save) {
     });
   }
   function restore(draft, snapshot) {
+    return mutate(draft, (text) => {
+      text.delete(0, text.length);
+      text.applyDelta(
+        validateDelta(snapshot.richContent || [{ insert: snapshot.content }]),
+      );
+    });
+  }
+  function replaceText(draft, find, replacement) {
+    return mutate(draft, (text) => {
+      const content = text.toString(),
+        index = content.indexOf(find);
+      if (index < 0 || content.indexOf(find, index + 1) >= 0)
+        throw Object.assign(
+          Error(
+            "The original quote has changed or is ambiguous. Propose a new edit.",
+          ),
+          { status: 409 },
+        );
+      let offset = 0,
+        attributes;
+      for (const op of text.toDelta()) {
+        if (offset + op.insert.length > index) {
+          attributes = op.attributes;
+          break;
+        }
+        offset += op.insert.length;
+      }
+      text.delete(index, find.length);
+      if (replacement) text.insert(index, replacement, attributes);
+    });
+  }
+  function mutate(draft, apply) {
     const c = context.getStore();
     const room = rooms.get(c.workspaceId + ":" + draft.id),
       doc = new Y.Doc();
@@ -238,25 +270,32 @@ function createCollaboration(db, security, save) {
       .get(c.workspaceId, draft.id);
     if (room) Y.applyUpdate(doc, Y.encodeStateAsUpdate(room.doc));
     else if (saved) Y.applyUpdate(doc, new Uint8Array(saved.content));
+    else
+      doc
+        .getText("content")
+        .applyDelta(draft.richContent || [{ insert: draft.content }]);
     const text = doc.getText("content"),
       vector = Y.encodeStateVector(doc);
-    doc.transact(() => {
-      text.delete(0, text.length);
-      text.applyDelta(
-        validateDelta(snapshot.richContent || [{ insert: snapshot.content }]),
-      );
-    });
+    try {
+      doc.transact(() => apply(text));
+    } catch (e) {
+      doc.destroy();
+      throw e;
+    }
+    validateDelta(text.toDelta());
+    const encoded = Y.encodeStateAsUpdate(doc);
+    if (text.length > 1000000 || encoded.length > 4 * 1024 * 1024) {
+      doc.destroy();
+      throw Object.assign(Error("Draft content or history limit reached."), {
+        status: 409,
+      });
+    }
     const delta = Y.encodeStateAsUpdate(doc, vector);
     db.exec("BEGIN IMMEDIATE");
     try {
       db.prepare(
         "INSERT OR REPLACE INTO collaborative_drafts VALUES(?,?,?,?)",
-      ).run(
-        c.workspaceId,
-        draft.id,
-        Y.encodeStateAsUpdate(doc),
-        new Date().toISOString(),
-      );
+      ).run(c.workspaceId, draft.id, encoded, new Date().toISOString());
       draft.content = text.toString();
       draft.richContent = text.toDelta();
       save();
@@ -280,6 +319,7 @@ function createCollaboration(db, security, save) {
   return {
     attach,
     restore,
+    replaceText,
     close() {
       clearInterval(guard);
       for (const ws of wss.clients) ws.close(1001, "Server shutting down");

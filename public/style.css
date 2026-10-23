@@ -1239,3 +1239,154 @@ blockquote button {
 .rich-actions {
   flex-wrap: wrap;
 }
+.run-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  padding: 22px;
+  text-align: left;
+  background: white;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.run-row > div {
+  flex: 1;
+}
+.run-row strong,
+.run-row small {
+  display: block;
+}
+.run-row small {
+  color: var(--muted);
+  margin-top: 8px;
+}
+.run-status {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: #edf0eb;
+  color: #42634b;
+  font-size: 12px;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+.run-status.waiting_approval {
+  background: #fbf1da;
+  color: #896325;
+}
+.run-status.failed,
+.run-status.rejected {
+  background: #fae5e0;
+  color: #9b4130;
+}
+.step-preview {
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.9;
+}
+.step-preview small {
+  color: var(--muted);
+  margin-left: 8px;
+}
+.builder-step {
+  padding: 20px;
+  background: #f5f6f2;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 15px 0;
+}
+.step-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.step-heading strong {
+  margin-right: auto;
+}
+.builder-step textarea {
+  min-height: 95px;
+}
+.source-checks {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 15px;
+  max-height: 220px;
+  overflow: auto;
+}
+.source-checks label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.source-checks input {
+  width: auto;
+  margin: 0;
+}
+.run-timeline {
+  padding-left: 24px;
+}
+.run-timeline li {
+  padding: 16px;
+  border-left: 3px solid var(--line);
+  margin-bottom: 10px;
+}
+.run-timeline li.complete {
+  border-color: #4f7965;
+}
+.run-timeline li.current {
+  border-color: #c7a264;
+  background: #faf8f1;
+}
+.run-timeline strong,
+.run-timeline small {
+  display: block;
+}
+.run-timeline small {
+  color: var(--muted);
+  margin: 8px 0;
+}
+.run-detail-heading {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.operations-note {
+  padding: 18px 22px;
+  background: #eff2ed;
+  border-left: 3px solid #6b8973;
+  margin-bottom: 24px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.rich-actions > label {
+  width: 100%;
+}
+aside nav {
+  overflow-y: auto;
+  min-height: 0;
+}
+aside {
+  max-height: 100vh;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 700px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .run-row {
+    gap: 8px;
+    padding: 15px;
+    flex-wrap: wrap;
+  }
+  .step-heading {
+    flex-wrap: wrap;
+  }
+}

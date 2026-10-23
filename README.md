@@ -52,3 +52,7 @@ See [deployment and operations](docs/OPERATIONS.md) for Docker Compose, HTTPS, i
 ## Boundaries
 
 Authentication, workspace isolation, matter grants, local accounts, revocable sessions, owner-managed members, persisted background review/draft jobs and audit records are implemented. This remains a single-instance foundation, not an independently audited production equivalent of Legora. Licensed research, OCR, Office add-ins, full DMS permission synchronization and monitoring are still missing. Rich-text Yjs collaboration, comments, checkpoints and Microsoft/Google snapshot connectors are implemented; see docs/COLLABORATION-AND-CONNECTORS.md. Extracted text is stored rather than original-file layout. Review tables still use deterministic passage extraction; generated assistant/draft analysis requires a configured provider. Read the operations document before deployment.
+
+## Workflow orchestration
+
+The Workflows library now supports an ordered-step builder, versioned definitions, selected sources, durable runs, approval gates, retry/cancel and links to resulting reviews/drafts/tasks. Intake tracks requests and responsible lawyers; document monitors turn new matching evidence into follow-up tasks. Skills have revision history, and shared drafts support proposed edits with accept/reject. See [workflow comparison and remaining gaps](docs/WORKFLOW-PARITY.md) for the exact implementation and limits.

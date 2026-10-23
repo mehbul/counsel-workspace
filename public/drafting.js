@@ -70,3 +70,40 @@ function restoreCheckpoint(id, checkpointId) {
     }
   };
 }
+async function draftSuggestions(id) {
+  try {
+    const items = await api(`drafts/${id}/suggestions`, undefined, "GET");
+    modal(
+      "Proposed edits",
+      `<p>Changes stay separate until accepted. Acceptance requires the exact original quote to appear once in the current draft; conflicting edits must be proposed again.</p><div class="recentlist">${items.map((s) => `<article class="draft-comment"><small>${esc(s.author)} · ${esc(s.status)}${s.reviewer ? " · " + esc(s.reviewer) : ""}</small><p><del>${esc(s.find)}</del></p><p><ins>${esc(s.replacement || "(delete quoted text)")}</ins></p><p>${esc(s.reason)}</p>${editable() && s.status === "pending" ? `<div class="rich-actions"><button class="primary" onclick="decideDraftSuggestion('${id}','${s.id}','accept')">Accept edit</button><button class="secondary" onclick="decideDraftSuggestion('${id}','${s.id}','reject')">Reject edit</button></div>` : ""}</article>`).join("") || "<p>No proposed edits yet.</p>"}</div>${editable() ? `<form id="suggestion-form"><label>Exact original quote<textarea name="find" required maxlength="100000"></textarea></label><label>Proposed replacement<textarea name="replacement" maxlength="100000"></textarea></label><label>Reason<input name="reason" maxlength="5000"></label><button class="primary">Propose edit</button></form>` : ""}`,
+    );
+    if ($("#suggestion-form"))
+      $("#suggestion-form").onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          await api(
+            `drafts/${id}/suggestions`,
+            Object.fromEntries(new FormData(e.target)),
+          );
+          await draftSuggestions(id);
+        } catch (e) {
+          toast(e.message);
+        }
+      };
+  } catch (e) {
+    toast(e.message);
+  }
+}
+async function decideDraftSuggestion(id, suggestionId, decision) {
+  try {
+    await api(
+      `drafts/${id}/suggestions/${suggestionId}`,
+      { decision },
+      "PATCH",
+    );
+    await refresh();
+    await draftSuggestions(id);
+  } catch (e) {
+    toast(e.message);
+  }
+}

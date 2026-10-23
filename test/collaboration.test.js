@@ -9,7 +9,14 @@ process.env.COUNSEL_DB = ":memory:";
 process.env.DATA_DIR = fs.mkdtempSync(
   path.join(os.tmpdir(), "counsel-collab-"),
 );
-const { app, db, jobs, createServer, collaboration } = require("../server");
+const {
+  app,
+  db,
+  jobs,
+  workflows,
+  createServer,
+  collaboration,
+} = require("../server");
 test("two editors converge, persist, reconnect; viewers cannot edit; origin and ACL are enforced", async () => {
   const server = createServer().listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
@@ -178,6 +185,60 @@ test("two editors converge, persist, reconnect; viewers cannot edit; origin and 
       true,
     );
     assert.equal((await owner.req(`drafts/${draft.id}/checkpoints`)).length, 2);
+    const proposal = await owner.req(`drafts/${draft.id}/suggestions`, {
+      find: "First editor.",
+      replacement: "Lead reviewer.",
+      reason: "Use the correct role.",
+    });
+    assert.equal(proposal.status, "pending");
+    assert.equal(
+      (
+        await owner.req(
+          `drafts/${draft.id}/suggestions/${proposal.id}`,
+          { decision: "accept" },
+          "PATCH",
+        )
+      ).status,
+      "accepted",
+    );
+    await wait(() =>
+      second.doc.getText("content").toString().startsWith("Lead reviewer."),
+    );
+    assert.equal(
+      first.doc.getText("content").toDelta()[0].attributes.bold,
+      true,
+    );
+    assert.ok(
+      (
+        await owner.req(
+          `drafts/${draft.id}/suggestions/${proposal.id}`,
+          { decision: "accept" },
+          "PATCH",
+        )
+      ).error,
+    );
+    const reject = await owner.req(`drafts/${draft.id}/suggestions`, {
+      find: "Lead reviewer.",
+      replacement: "No replacement",
+    });
+    assert.equal(
+      (
+        await owner.req(
+          `drafts/${draft.id}/suggestions/${reject.id}`,
+          { decision: "reject" },
+          "PATCH",
+        )
+      ).status,
+      "rejected",
+    );
+    await owner.req(`drafts/${draft.id}/restore`, {
+      checkpointId: checkpoint.id,
+    });
+    await wait(
+      () =>
+        first.doc.getText("content").toString() === saved.content &&
+        second.doc.getText("content").toString() === saved.content,
+    );
     await assert.rejects(connect(owner, draft.id, "https://untrusted.example"));
     await owner.req("admin/users", {
       email: "viewer@collab.test",
@@ -236,6 +297,7 @@ test("two editors converge, persist, reconnect; viewers cannot edit; origin and 
     collaboration.close();
     await jobs.close();
     await new Promise((r) => server.close(r));
+    await workflows.close();
     db.close();
     fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true });
   }

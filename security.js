@@ -626,7 +626,8 @@ function validate(req, res, next) {
     schemas[`${req.method} ${req.path}`] ||
     (req.method === "PATCH" &&
     req.path.startsWith("/drafts/") &&
-    !req.path.includes("/comments/")
+    !req.path.includes("/comments/") &&
+    !req.path.includes("/suggestions/")
       ? z.object({
           title: text(200).optional(),
           content: z.string().max(1000000).optional(),

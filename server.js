@@ -185,6 +185,13 @@ const collaboration = require("./collaboration").createCollaboration(
   save,
 );
 require("./drafting").installDraftReview(app, db, save, collaboration);
+const workflows = require("./workflows").installWorkflows(
+  app,
+  db,
+  security,
+  save,
+  { createReview, createDraft, answer, retrieve },
+);
 function createServer() {
   const server = require("node:http").createServer(app);
   collaboration.attach(server);
@@ -407,9 +414,9 @@ async function createReview(payload, runId) {
     const existing = state.reviews.find((r) => r.id === runId);
     if (existing) return existing;
   }
-  const { matterId, name, columns } = payload;
+  const { matterId, name, columns, documentIds } = payload;
   if (!columns?.length || columns.length > 12)
-    return res.status(400).json({ error: "Use 1–12 review columns." });
+    throw Error("Use 1–12 review columns.");
   const review = {
     id: runId || id(),
     matterId,
@@ -419,7 +426,9 @@ async function createReview(payload, runId) {
     created: new Date().toISOString(),
   };
   for (const d of state.documents.filter(
-    (d) => d.matterId === matterId && !d.supersededBy,
+    (d) =>
+      d.matterId === matterId &&
+      (documentIds ? documentIds.includes(d.id) : !d.supersededBy),
   )) {
     for (let c = 0; c < columns.length; c++) {
       const evidence = retrieve(columns[c], [d]).slice(0, 2);
@@ -465,10 +474,15 @@ async function createDraft(payload, runId) {
     const existing = state.drafts.find((d) => d.id === runId);
     if (existing) return existing;
   }
-  const { matterId, title, prompt } = payload;
+  const { matterId, title, prompt, documentIds, instructions } = payload;
   const result = await answer(
     prompt || "Summarize governing law, liability and assignment",
-    state.documents.filter((d) => d.matterId === matterId && !d.supersededBy),
+    state.documents.filter(
+      (d) =>
+        d.matterId === matterId &&
+        (documentIds ? documentIds.includes(d.id) : !d.supersededBy),
+    ),
+    instructions,
   );
   const draft = {
     id: runId || id(),
@@ -597,7 +611,7 @@ function start() {
   for (const sig of ["SIGTERM", "SIGINT"])
     process.once(sig, () => {
       collaboration.close();
-      const drained = jobs.close();
+      const drained = Promise.all([jobs.close(), workflows.close()]);
       server.close(async () => {
         await drained;
         db.close();
@@ -607,4 +621,12 @@ function start() {
     });
   return server;
 }
-module.exports = { app, retrieve, db, jobs, createServer, collaboration };
+module.exports = {
+  app,
+  retrieve,
+  db,
+  jobs,
+  workflows,
+  createServer,
+  collaboration,
+};
