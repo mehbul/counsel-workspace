@@ -184,6 +184,7 @@ const collaboration = require("./collaboration").createCollaboration(
   security,
   save,
 );
+require("./drafting").installDraftReview(app, db, save, collaboration);
 function createServer() {
   const server = require("node:http").createServer(app);
   collaboration.attach(server);
@@ -512,17 +513,6 @@ app.get("/api/drafts/:id/export", async (req, res, next) => {
   try {
     const d = state.drafts.find((d) => d.id === req.params.id);
     if (!d) return res.sendStatus(404);
-    const { Document, Packer, Paragraph, HeadingLevel } = require("docx");
-    const doc = new Document({
-      sections: [
-        {
-          children: [
-            new Paragraph({ text: d.title, heading: HeadingLevel.TITLE }),
-            ...d.content.split("\n").map((text) => new Paragraph(text)),
-          ],
-        },
-      ],
-    });
     res.setHeader(
       "Content-Disposition",
       'attachment; filename="memorandum.docx"',
@@ -531,7 +521,7 @@ app.get("/api/drafts/:id/export", async (req, res, next) => {
       .type(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       )
-      .send(await Packer.toBuffer(doc));
+      .send(await require("./rich-text").buildDocx(d));
   } catch (e) {
     next(e);
   }

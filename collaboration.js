@@ -2,6 +2,7 @@ const { WebSocketServer, WebSocket } = require("ws");
 const Y = require("yjs");
 const { randomUUID } = require("node:crypto");
 const { context } = require("./security");
+const { validateDelta } = require("./rich-text");
 function createCollaboration(db, security, save) {
   db.exec(
     "CREATE TABLE IF NOT EXISTS collaborative_drafts(workspace_id TEXT NOT NULL,draft_id TEXT NOT NULL,content BLOB NOT NULL,updated TEXT NOT NULL,PRIMARY KEY(workspace_id,draft_id))",
@@ -124,6 +125,9 @@ function createCollaboration(db, security, save) {
               Y.applyUpdate(candidate, Y.encodeStateAsUpdate(room.doc));
               Y.applyUpdate(candidate, update);
               const content = candidate.getText("content").toString();
+              const richContent = validateDelta(
+                candidate.getText("content").toDelta(),
+              );
               if (content.length > 1000000) throw Error("Draft is too large");
               const encoded = Y.encodeStateAsUpdate(candidate);
               if (encoded.length > 4 * 1024 * 1024)
@@ -139,6 +143,7 @@ function createCollaboration(db, security, save) {
                   new Date().toISOString(),
                 );
                 target.content = content;
+                target.richContent = richContent;
                 save();
                 db.exec("COMMIT");
               } catch (e) {
@@ -222,8 +227,59 @@ function createCollaboration(db, security, save) {
       );
     });
   }
+  function restore(draft, snapshot) {
+    const c = context.getStore();
+    const room = rooms.get(c.workspaceId + ":" + draft.id),
+      doc = new Y.Doc();
+    const saved = db
+      .prepare(
+        "SELECT content FROM collaborative_drafts WHERE workspace_id=? AND draft_id=?",
+      )
+      .get(c.workspaceId, draft.id);
+    if (room) Y.applyUpdate(doc, Y.encodeStateAsUpdate(room.doc));
+    else if (saved) Y.applyUpdate(doc, new Uint8Array(saved.content));
+    const text = doc.getText("content"),
+      vector = Y.encodeStateVector(doc);
+    doc.transact(() => {
+      text.delete(0, text.length);
+      text.applyDelta(
+        validateDelta(snapshot.richContent || [{ insert: snapshot.content }]),
+      );
+    });
+    const delta = Y.encodeStateAsUpdate(doc, vector);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.prepare(
+        "INSERT OR REPLACE INTO collaborative_drafts VALUES(?,?,?,?)",
+      ).run(
+        c.workspaceId,
+        draft.id,
+        Y.encodeStateAsUpdate(doc),
+        new Date().toISOString(),
+      );
+      draft.content = text.toString();
+      draft.richContent = text.toDelta();
+      save();
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    }
+    if (room) {
+      Y.applyUpdate(room.doc, delta);
+      for (const peer of room.clients) {
+        if (authorized(peer.identity.req, draft.id))
+          send(peer, {
+            type: "update",
+            update: Buffer.from(delta).toString("base64"),
+          });
+      }
+    }
+    doc.destroy();
+  }
   return {
     attach,
+    restore,
     close() {
       clearInterval(guard);
       for (const ws of wss.clients) ws.close(1001, "Server shutting down");

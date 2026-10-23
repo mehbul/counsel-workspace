@@ -29,9 +29,38 @@ test("connector credentials encrypted; repeated imports idempotent; changes reta
     };
   let version = "1",
     writes = 0,
-    fetches = [];
+    fetches = [],
+    nativeMode = false,
+    throttled = false,
+    delays = [];
   const mockFetch = async (url, init = {}) => {
     fetches.push(String(url));
+    if (nativeMode && String(url).includes("/export?"))
+      return new Response(
+        await require("../rich-text").buildDocx({
+          title: "Native memo",
+          content: "Native Google document content.",
+        }),
+      );
+    if (nativeMode && String(url).includes("/drive/v3/files?")) {
+      if (!throttled) {
+        throttled = true;
+        return new Response("", {
+          status: 429,
+          headers: { "Retry-After": "1" },
+        });
+      }
+      return Response.json({
+        files: [
+          {
+            id: "native-doc",
+            name: "Native memo",
+            modifiedTime: "1",
+            mimeType: "application/vnd.google-apps.document",
+          },
+        ],
+      });
+    }
     if (String(url).startsWith("https://login.microsoftonline.com/"))
       return Response.json({ access_token: "graph-token" });
     if (
@@ -105,7 +134,7 @@ test("connector credentials encrypted; repeated imports idempotent; changes reta
     { audit: (...x) => audit.push(x) },
     () => {},
     () => {},
-    { fetch: mockFetch },
+    { fetch: mockFetch, wait: async (ms) => delays.push(ms) },
   );
   app.use((err, req, res, next) =>
     res.status(400).json({ error: "Connector request failed" }),
@@ -207,6 +236,27 @@ test("connector credentials encrypted; repeated imports idempotent; changes reta
       200,
     );
     assert.equal(writes, 2);
+    nativeMode = true;
+    const native = await req("", {
+      provider: "google",
+      name: "Native docs",
+      clientId: "test-client",
+      clientSecret: "test-secret",
+      refreshToken: "test-refresh",
+      folderId: "native-folder",
+      matterId: mid,
+    });
+    const nativeResult = await context.run(store, () =>
+      connectors.sync({ connectorId: native.data.id, matterId: mid }),
+    );
+    assert.equal(nativeResult.imported, 1);
+    assert.ok(
+      state.documents.some((d) =>
+        d.text.includes("Native Google document content."),
+      ),
+    );
+    assert.deepEqual(delays, [1000]);
+    assert.ok(fetches.some((u) => u.includes("/native-doc/export?mimeType=")));
   } finally {
     await new Promise((r) => server.close(r));
     db.close();

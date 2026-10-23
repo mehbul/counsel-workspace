@@ -72,6 +72,7 @@ function createConnectors(app, db, security, save, enqueue, options = {}) {
       driveId: safeId,
       folderId: safeId,
       matterId: z.string().uuid(),
+      recursive: z.boolean().default(false),
     }),
     z.object({
       provider: z.literal("google"),
@@ -81,6 +82,7 @@ function createConnectors(app, db, security, save, enqueue, options = {}) {
       refreshToken: z.string().min(1).max(4096),
       folderId: safeId,
       matterId: z.string().uuid(),
+      recursive: z.boolean().default(false),
     }),
   ]);
   const get = (id) =>
@@ -149,12 +151,38 @@ function createConnectors(app, db, security, save, enqueue, options = {}) {
     req.body = { connectorId: c.id, matterId: open(c.config).matterId };
     enqueue(req, res, next, "connector-sync");
   });
-  async function bounded(url, init = {}, limit = 20 * 1024 * 1024) {
+  async function bounded(
+    url,
+    init = {},
+    limit = 20 * 1024 * 1024,
+    attempt = 0,
+  ) {
     const response = await fetcher(url, {
       ...init,
       signal: AbortSignal.timeout(30000),
       redirect: "manual",
     });
+    if (
+      [429, 503].includes(response.status) &&
+      attempt < 3 &&
+      (!init.method || init.method === "GET" || String(url).includes("/token"))
+    ) {
+      const raw = response.headers.get("retry-after");
+      const seconds = raw
+        ? /^\d+$/.test(raw)
+          ? Number(raw)
+          : Math.max(0, (Date.parse(raw) - Date.now()) / 1000)
+        : 2 ** attempt;
+      if (!Number.isFinite(seconds) || seconds > 30)
+        throw Error(
+          "Provider requested a longer retry delay. Retry the sync later.",
+        );
+      await response.body?.cancel();
+      await (options.wait || ((ms) => new Promise((r) => setTimeout(r, ms))))(
+        Math.max(250, seconds * 1000),
+      );
+      return bounded(url, init, limit, attempt + 1);
+    }
     if (response.status === 429) throw Error("Provider rate limit reached");
     if (!response.ok && response.status !== 302)
       throw Error("Connector provider rejected the request");
@@ -209,46 +237,17 @@ function createConnectors(app, db, security, save, enqueue, options = {}) {
     return data.access_token;
   }
   async function list(c, token) {
-    if (c.provider === "microsoft") {
-      const url = `${graphOrigin}/v1.0/drives/${encodeURIComponent(c.driveId)}/${c.folderId === "root" ? "root" : "items/" + encodeURIComponent(c.folderId)}/children?$top=200&$select=id,name,eTag,size,file`;
-      const result = await json(url, {
-        headers: { Authorization: "Bearer " + token },
-      });
-      return {
-        files: (result.value || [])
-          .filter((x) => x.file)
-          .map((x) => ({
-            id: x.id,
-            name: x.name,
-            etag: x.eTag || "",
-            size: x.size,
-          })),
-        hasMore: !!result["@odata.nextLink"],
-      };
-    }
-    const params = new URLSearchParams({
-      q: `'${c.folderId.replace(/'/g, "\\'")}' in parents and trashed = false`,
-      fields: "nextPageToken,files(id,name,modifiedTime,size,mimeType)",
-      pageSize: "200",
-    });
-    const result = await json(googleOrigin + "/drive/v3/files?" + params, {
-      headers: { Authorization: "Bearer " + token },
-    });
-    return {
-      files: (result.files || []).map((x) => ({
-        id: x.id,
-        name: x.name,
-        etag: x.modifiedTime || "",
-        size: Number(x.size || 0),
-      })),
-      hasMore: !!result.nextPageToken,
-    };
+    return require("./connector-list").collectFiles(c, (url) =>
+      json(url, { headers: { Authorization: "Bearer " + token } }),
+    );
   }
   async function download(c, file, token) {
     let url =
       c.provider === "microsoft"
         ? `${graphOrigin}/v1.0/drives/${encodeURIComponent(c.driveId)}/items/${encodeURIComponent(file.id)}/content`
-        : `${googleOrigin}/drive/v3/files/${encodeURIComponent(file.id)}?alt=media`;
+        : file.nativeDoc
+          ? `${googleOrigin}/drive/v3/files/${encodeURIComponent(file.id)}/export?mimeType=application%2Fvnd.openxmlformats-officedocument.wordprocessingml.document`
+          : `${googleOrigin}/drive/v3/files/${encodeURIComponent(file.id)}?alt=media&supportsAllDrives=true`;
     let result = await bounded(url, {
       headers: { Authorization: "Bearer " + token },
     });
@@ -352,7 +351,7 @@ function createConnectors(app, db, security, save, enqueue, options = {}) {
       }
       const result = { imported, updated, skipped, hasMore: listing.hasMore };
       db.prepare("UPDATE connectors SET status=?,last_sync=? WHERE id=?").run(
-        listing.hasMore ? "Partial: folder exceeds 200 items" : "Synced",
+        listing.hasMore ? "Partial: traversal budget exceeded" : "Synced",
         new Date().toISOString(),
         row.id,
       );
@@ -394,19 +393,7 @@ function createConnectors(app, db, security, save, enqueue, options = {}) {
         return res
           .status(404)
           .json({ error: "Draft not found in this connector matter." });
-      const { Document, Packer, Paragraph } = require("docx");
-      const buffer = await Packer.toBuffer(
-        new Document({
-          sections: [
-            {
-              children: [
-                new Paragraph(draft.title),
-                ...draft.content.split("\n").map((x) => new Paragraph(x)),
-              ],
-            },
-          ],
-        }),
-      );
+      const buffer = await require("./rich-text").buildDocx(draft);
       const token = await accessToken(c);
       let remote;
       if (c.provider === "microsoft") {

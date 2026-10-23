@@ -1,11 +1,14 @@
 import * as Y from "yjs";
+import Quill from "quill";
+import { QuillBinding } from "y-quill";
+import "quill/dist/quill.snow.css";
 let dispose;
 window.CounselCollab = {
   detach() {
     dispose?.();
     dispose = null;
   },
-  attach(draftId, textarea, status) {
+  attach(draftId, element, status) {
     this.detach();
     const doc = new Y.Doc(),
       text = doc.getText("content");
@@ -16,20 +19,60 @@ window.CounselCollab = {
       hasLocal = false,
       sequence = 0,
       acked = 0;
-    textarea.disabled = true;
+    let binding, undo;
+    const quill = new Quill(element, {
+      theme: "snow",
+      readOnly: true,
+      formats: [
+        "bold",
+        "italic",
+        "underline",
+        "strike",
+        "header",
+        "list",
+        "blockquote",
+        "align",
+        "indent",
+      ],
+      modules: {
+        history: false,
+        toolbar: [
+          [{ header: [1, 2, 3, false] }],
+          ["bold", "italic", "underline", "strike"],
+          [{ list: "ordered" }, { list: "bullet" }],
+          ["blockquote"],
+          [{ align: [] }],
+          ["clean"],
+        ],
+        keyboard: {
+          bindings: {
+            undo: {
+              key: "z",
+              shortKey: true,
+              handler: () => {
+                undo?.undo();
+                return false;
+              },
+            },
+            redo: {
+              key: "z",
+              shortKey: true,
+              shiftKey: true,
+              handler: () => {
+                undo?.redo();
+                return false;
+              },
+            },
+          },
+        },
+      },
+    });
+    quill.root.setAttribute("aria-label", "Draft content");
     const label = (s) => {
       if (status) status.textContent = s;
     };
-    function show() {
-      const start = textarea.selectionStart,
-        end = textarea.selectionEnd;
-      textarea.value = text.toString();
-      textarea.setSelectionRange(
-        Math.min(start, textarea.value.length),
-        Math.min(end, textarea.value.length),
-      );
-    }
-    text.observe(show);
+    this.undo = () => undo?.undo();
+    this.redo = () => undo?.redo();
     const send = (update) => {
       if (ws?.readyState === WebSocket.OPEN) {
         let binary = "";
@@ -44,35 +87,12 @@ window.CounselCollab = {
       }
     };
     doc.on("update", (update, origin) => {
-      if (origin === "local") {
+      if (origin === binding || origin === undo) {
         hasLocal = true;
         label("Saving changes…");
         send(update);
       }
     });
-    textarea.oninput = () => {
-      if (!ready) return;
-      const before = text.toString(),
-        after = textarea.value;
-      let start = 0;
-      while (
-        start < before.length &&
-        start < after.length &&
-        before[start] === after[start]
-      )
-        start++;
-      let end = 0;
-      while (
-        end < before.length - start &&
-        end < after.length - start &&
-        before[before.length - 1 - end] === after[after.length - 1 - end]
-      )
-        end++;
-      doc.transact(() => {
-        text.delete(start, before.length - start - end);
-        text.insert(start, after.slice(start, after.length - end));
-      }, "local");
-    };
     function connect() {
       if (closed) return;
       label("Connecting to shared draft…");
@@ -88,7 +108,13 @@ window.CounselCollab = {
           Y.applyUpdate(doc, update, "remote");
           if (m.type === "sync") {
             ready = true;
-            textarea.disabled = m.readOnly;
+            if (!binding) {
+              binding = new QuillBinding(text, quill);
+              undo = new Y.UndoManager(text, {
+                trackedOrigins: new Set([binding]),
+              });
+            }
+            quill.enable(!m.readOnly);
             label(
               m.readOnly
                 ? "Read-only shared draft"
@@ -110,7 +136,7 @@ window.CounselCollab = {
           );
       };
       ws.onclose = (e) => {
-        textarea.disabled = true;
+        quill.enable(false);
         ready = false;
         if (closed) return;
         if (e.code === 1008) {
@@ -125,7 +151,9 @@ window.CounselCollab = {
     dispose = () => {
       closed = true;
       clearTimeout(timer);
-      textarea.oninput = null;
+      binding?.destroy();
+      undo?.destroy();
+      quill.enable(false);
       ws?.close();
       doc.destroy();
     };

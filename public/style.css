@@ -1194,3 +1194,48 @@ blockquote button {
   width: auto;
   margin: 0 8px 0 0;
 }
+
+.rich-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.editorpaper .ql-toolbar {
+  border-color: var(--line);
+  font-family: inherit;
+}
+.editorpaper .ql-container {
+  border-color: var(--line);
+  font:
+    15px/1.8 Georgia,
+    serif;
+}
+.editorpaper .ql-editor {
+  min-height: 460px;
+  padding: 25px;
+}
+.editorpaper .ql-editor p {
+  font: inherit;
+  color: inherit;
+}
+.editorpaper .ql-editor h1 {
+  font-size: 32px;
+}
+.editorpaper .ql-editor h2 {
+  font-size: 25px;
+}
+.editorpaper .ql-editor h3 {
+  font-size: 20px;
+}
+
+.draft-comment {
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.draft-comment p {
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+.rich-actions {
+  flex-wrap: wrap;
+}

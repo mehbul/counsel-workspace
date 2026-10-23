@@ -10,9 +10,9 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATA_DIR=/data
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
-COPY server.js security.js parser.js parse-worker.js parse-process.js jobs.js collaboration.js connectors.js ./
+COPY server.js security.js parser.js parse-worker.js parse-process.js jobs.js collaboration.js connectors.js connector-list.js rich-text.js drafting.js ./
 COPY public ./public
-COPY --from=build /build/public/collaboration.bundle.js ./public/collaboration.bundle.js
+COPY --from=build /build/public/collaboration.bundle.js /build/public/collaboration.bundle.css ./public/
 COPY scripts ./scripts
 RUN mkdir /data && chown node:node /data /app
 USER node

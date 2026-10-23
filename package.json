@@ -7,7 +7,7 @@
     "test": "node --test",
     "start": "node server.js",
     "backup": "node scripts/backup.js",
-    "format:check": "prettier --check server.js security.js jobs.js collaboration.js connectors.js parser.js parse-process.js parse-worker.js client public/app.js public/auth.js public/connectors.js public/style.css public/index.html test scripts",
+    "format:check": "prettier --check server.js security.js jobs.js collaboration.js connectors.js connector-list.js drafting.js rich-text.js parser.js parse-process.js parse-worker.js client public/app.js public/auth.js public/connectors.js public/drafting.js public/style.css public/index.html test scripts",
     "build": "esbuild client/collaboration.js --bundle --minify --outfile=public/collaboration.bundle.js",
     "prestart": "npm run build"
   },
@@ -24,7 +24,9 @@
     "mammoth": "^1.13.0",
     "multer": "^2.5.0",
     "pdf-parse": "^2.4.5",
+    "quill": "2.0.2",
     "ws": "^8.22.0",
+    "y-quill": "^1.0.0",
     "yjs": "^13.6.33",
     "zod": "^4.6.7"
   },

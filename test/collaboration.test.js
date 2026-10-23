@@ -119,6 +119,65 @@ test("two editors converge, persist, reconnect; viewers cannot edit; origin and 
         .prepare("SELECT content FROM collaborative_drafts WHERE draft_id=?")
         .get(draft.id),
     );
+    first.doc.transact(
+      () => first.doc.getText("content").format(0, 13, { bold: true }),
+      "local",
+    );
+    await wait(
+      () =>
+        second.doc.getText("content").toDelta()[0].attributes?.bold === true,
+    );
+    const formatted = (await owner.req("state")).drafts.find(
+      (d) => d.id === draft.id,
+    );
+    assert.equal(formatted.richContent[0].attributes.bold, true);
+    const { buildDocx } = require("../rich-text");
+    const html = await require("mammoth").convertToHtml({
+      buffer: await buildDocx(formatted),
+    });
+    assert.match(html.value, /<strong>First editor/);
+    const checkpoint = await owner.req(`drafts/${draft.id}/checkpoints`, {
+      name: "Reviewed version",
+    });
+    assert.ok(checkpoint.id);
+    const comment = await owner.req(`drafts/${draft.id}/comments`, {
+      body: "Confirm governing law.",
+    });
+    assert.ok(comment.id);
+    await owner.req(
+      `drafts/${draft.id}/comments/${comment.id}`,
+      { resolved: true },
+      "PATCH",
+    );
+    assert.equal(
+      (await owner.req(`drafts/${draft.id}/comments`))[0].resolved,
+      1,
+    );
+    first.doc.transact(
+      () => first.doc.getText("content").insert(0, "Later addition. "),
+      "local",
+    );
+    await wait(() =>
+      second.doc.getText("content").toString().startsWith("Later addition."),
+    );
+    assert.equal(
+      (
+        await owner.req(`drafts/${draft.id}/restore`, {
+          checkpointId: checkpoint.id,
+        })
+      ).ok,
+      true,
+    );
+    await wait(
+      () =>
+        first.doc.getText("content").toString() === saved.content &&
+        second.doc.getText("content").toString() === saved.content,
+    );
+    assert.equal(
+      first.doc.getText("content").toDelta()[0].attributes.bold,
+      true,
+    );
+    assert.equal((await owner.req(`drafts/${draft.id}/checkpoints`)).length, 2);
     await assert.rejects(connect(owner, draft.id, "https://untrusted.example"));
     await owner.req("admin/users", {
       email: "viewer@collab.test",
@@ -137,6 +196,17 @@ test("two editors converge, persist, reconnect; viewers cannot edit; origin and 
       email: "viewer@collab.test",
       password: "Viewer test phrase with length",
     });
+    assert.ok(
+      (await viewer.req(`drafts/${draft.id}/comments`, { body: "Denied" }))
+        .error,
+    );
+    assert.ok(
+      (
+        await viewer.req(`drafts/${draft.id}/restore`, {
+          checkpointId: checkpoint.id,
+        })
+      ).error,
+    );
     const read = await connect(viewer, draft.id);
     assert.equal(read.readOnly, true);
     const closed = new Promise((r) => read.ws.once("close", (code) => r(code)));
