@@ -17,3 +17,13 @@ jobs:
       - run: npm test
       - run: npm audit --omit=dev --audit-level=high
       - run: docker build -t counsel:test .
+      - name: Smoke-test hardened container
+        run: |
+          docker run -d --name counsel-smoke --read-only --tmpfs /tmp --memory 1g --cap-drop ALL --security-opt no-new-privileges -e APP_ORIGIN=https://staging.example -e COOKIE_SECURE=true -v /data -p 127.0.0.1:3000:3000 counsel:test
+          curl --fail --retry 15 --retry-delay 2 --retry-all-errors http://127.0.0.1:3000/health/ready
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3000/api/state)" = 401
+      - name: Container diagnostics and cleanup
+        if: always()
+        run: |
+          docker logs counsel-smoke || true
+          docker rm -fv counsel-smoke || true
