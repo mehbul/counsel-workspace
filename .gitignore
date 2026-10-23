@@ -1,0 +1,17 @@
+node_modules/
+data/
+.env
+test-output/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.log
+*.pem
+*.key
+.env.*
+!.env.example
+backups/
+coverage/

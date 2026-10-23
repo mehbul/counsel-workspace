@@ -1,0 +1,38 @@
+{
+  "name": "counsel-workspace",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test",
+    "start": "node server.js",
+    "backup": "node scripts/backup.js",
+    "format:check": "prettier --check server.js security.js jobs.js collaboration.js connectors.js parser.js parse-process.js parse-worker.js client public/app.js public/auth.js public/connectors.js public/style.css public/index.html test scripts",
+    "build": "esbuild client/collaboration.js --bundle --minify --outfile=public/collaboration.bundle.js",
+    "prestart": "npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "argon2": "^0.45.1",
+    "docx": "^9.13.0",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "mammoth": "^1.13.0",
+    "multer": "^2.5.0",
+    "pdf-parse": "^2.4.5",
+    "ws": "^8.22.0",
+    "yjs": "^13.6.33",
+    "zod": "^4.6.7"
+  },
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "prettier": "^3.9.10"
+  }
+}

@@ -1,0 +1,6 @@
+{$DOMAIN} {
+  request_body {
+    max_size 105MB
+  }
+  reverse_proxy app:3000
+}
