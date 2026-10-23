@@ -1,3 +1,5 @@
+[![Verify](https://github.com/mehbul/counsel-workspace/actions/workflows/ci.yml/badge.svg)](https://github.com/mehbul/counsel-workspace/actions/workflows/ci.yml)
+
 # Counsel workspace
 
 An independently implemented Legora-style legal workspace with authenticated local accounts and a self-hosted Docker deployment configuration. Original branding; based on the public workflow investigation in `legora-reconstruction.md`. This is a functional local prototype, not a complete or production-equivalent replica of Legora.
@@ -45,7 +47,7 @@ Integration tests use isolated in-memory databases and temporary data directorie
 
 ## Self-hosted deployment
 
-See [deployment and operations](docs/OPERATIONS.md) for Docker Compose, HTTPS, initial setup, members, matter access, backup/restore and release gates. Docker build and live deployment have not been verified on this Windows host because Docker is unavailable.
+See [deployment and operations](docs/OPERATIONS.md) for Docker Compose, HTTPS, initial setup, members, matter access, backup/restore and release gates. GitHub CI verified the Docker image build, hardened container startup and anonymous API rejection. Live HTTPS deployment and enterprise provider connections remain unverified.
 
 ## Boundaries
 

@@ -43,7 +43,7 @@ Sync uses the existing durable job queue. It can be resumed/replayed after proce
 - Mock-provider connector tests for Google and Microsoft token acquisition, listing, imports, repeated sync, changed-version retention, secret redaction/encryption, safe Graph download redirect, explicit DOCX upload, and owner-only operations.
 - Browser checks of the restored navigation, shared editor autosave, two-tab content/presence and connector setup form.
 
-**Not verified:** live Microsoft/Google credentials, provider consent/ACL policies, live file writeback, Docker build/TLS deployment, multi-replica scaling, legal research accuracy, or full Legora equivalence.
+**Not verified:** live Microsoft/Google credentials, provider consent/ACL policies, live file writeback, live TLS deployment, multi-replica scaling, legal research accuracy, or full Legora equivalence.
 
 ## Primary implementation references
 

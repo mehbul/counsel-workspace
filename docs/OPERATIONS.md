@@ -2,7 +2,7 @@
 
 ## Current release status
 
-This release adds a deployable single-instance foundation; it is not independently certified as production-ready or equivalent to Legora. Local security and regression tests pass. Docker is not installed on the development host, so image build, TLS issuance, container health checks, resource limits and reverse-proxy behavior require staging verification. Do not treat the configuration files as proof of a successful deployment.
+This release adds a deployable single-instance foundation; it is not independently certified as production-ready or equivalent to Legora. Local security and regression tests pass. GitHub CI verified the Docker image build, startup under a read-only filesystem, readiness response and anonymous API rejection. TLS issuance, realistic resource/load limits and reverse-proxy behavior still require staging verification. Do not treat the configuration files as proof of a successful deployment.
 
 ## Deployment
 
