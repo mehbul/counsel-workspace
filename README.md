@@ -2,14 +2,16 @@
 
 # Counsel workspace
 
-An independently implemented Legora-style legal workspace with authenticated local accounts and a self-hosted Docker deployment configuration. Original branding; based on the public workflow investigation in `legora-reconstruction.md`. This is a functional local prototype, not a complete or production-equivalent replica of Legora.
+A self-hosted legal workspace that Codex, Claude Code and compatible MCP assistants can use without a Legora subscription. Run it with evidence-only retrieval, your existing assistant, or a locally served model. No paid model API is required, and generation is disabled by default. The repository remains private for now. This is an independent implementation, not full Legora parity or a production-equivalence claim.
+
+See [assistant and local-model setup](docs/ASSISTANTS.md) for Codex, Claude, other MCP clients and DeepSeek-compatible model options. See [the remaining parity gaps](docs/WORKFLOW-PARITY.md) for what still needs building and verification.
 
 ## Run
 
 Requires Node 24.15 or newer.
 
 ```sh
-npm install
+npm ci
 npm start
 ```
 
@@ -22,20 +24,23 @@ Open http://127.0.0.1:3000. The service binds to loopback. SQLite data is stored
 - Review tables with prompt columns, evidence inspection, editable findings, locks and review status; CSV export.
 - Editable drafting workspace and real DOCX export.
 - Reusable instructions, three executable workflow templates, task lists and activity history.
+- MCP tools for scoped evidence reading and host-authored drafts, review tables and tasks, with expiring/revocable read or write keys.
+- Optional local Ollama or OpenAI-compatible model generation; explicit provider selection prevents accidental API usage.
 - Responsive layout and accessible native forms/dialogs.
 
-Local mode uses deterministic passage search, including basic clause synonym matching. Review tables extract matching passages; they do not use a legal reasoning model. Creating a draft in local mode compiles source excerpts. No external legal-research corpus or case-law verification is included.
+Evidence-only mode uses deterministic passage search, including basic clause synonym matching. Its review tables extract matching passages and its drafts compile source excerpts. Connected assistants can instead reason over those sources and save their own unreviewed analyses, without Counsel making model API calls. No external legal-research corpus or case-law verification is included.
 
 ## Optional generated analysis
 
-Start with `OPENAI_API_KEY` in the server environment to enable generated assistant responses and drafts. `OPENAI_MODEL` optionally overrides `gpt-4.1-mini`. On Windows PowerShell:
+For local generation without a paid model API, follow the Ollama setup in [ASSISTANTS.md](docs/ASSISTANTS.md). To explicitly enable the optional OpenAI API path, set both `AI_PROVIDER=openai` and `OPENAI_API_KEY`. `OPENAI_MODEL` optionally overrides `gpt-4.1-mini`. On Windows PowerShell:
 
 ```powershell
+$env:AI_PROVIDER = 'openai'
 $env:OPENAI_API_KEY = 'your-key'
 npm start
 ```
 
-This sends the question and retrieved document passages to OpenAI and may incur provider charges. The UI reports whether a provider key is present; an invalid key produces an actionable request error. No key is bundled. The provider path requires a valid key and was not live-tested without one.
+This optional path sends the question and retrieved passages to OpenAI and may incur provider charges. No key is bundled. The UI reports model configuration, not live endpoint health. Live provider/model quality has not been verified here. Set `AI_PROVIDER=evidence` to disable generation. MCP host reasoning uses the connected assistant's own plan and limits; a cloud assistant receives returned source text under its provider policy.
 
 ## Verify
 

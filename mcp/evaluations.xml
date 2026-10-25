@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Read-only host evaluations against the unmodified synthetic Project Northstar sources. Not legal-quality certification. -->
+<evaluation>
+  <qa_pair><question>In Project Northstar, inspect the agreements and identify the one governed by New York law. Return its document name exactly.</question><answer>Services Agreement — Meridian</answer></qa_pair>
+  <qa_pair><question>Compare the confidentiality agreement and services agreement. Which document uses an explicit GBP 500,000 liability cap?</question><answer>Mutual NDA — Acme &amp; Northstar</answer></qa_pair>
+  <qa_pair><question>Read the confidentiality agreement's duration and surviving obligations. For how many years do its confidentiality obligations survive termination?</question><answer>three years</answer></qa_pair>
+  <qa_pair><question>Find the services agreement's fee and payment provisions. What is its monthly fee?</question><answer>GBP 25,000</answer></qa_pair>
+  <qa_pair><question>Find the services agreement's renewal provision rather than its breach clause. How many days of written notice prevent automatic renewal?</question><answer>60 days</answer></qa_pair>
+  <qa_pair><question>Compare the services agreement's liability and renewal provisions. What period of paid fees determines its liability cap?</question><answer>the preceding twelve months</answer></qa_pair>
+  <qa_pair><question>Inspect Project Northstar's data processing source. What is the maximum stated personal data breach notification period?</question><answer>48 hours</answer></qa_pair>
+  <qa_pair><question>Read the data processing source's subprocessor and deletion provisions. How much prior notice is required for a new subprocessor?</question><answer>30 days</answer></qa_pair>
+  <qa_pair><question>Compare processor and controller roles in the data processing addendum. Which organization is the controller?</question><answer>Northstar Holdings Ltd</answer></qa_pair>
+  <qa_pair><question>Inspect the assignment provisions across the agreements. Which agreement permits supplier assignment to an affiliate on written notice?</question><answer>Services Agreement — Meridian</answer></qa_pair>
+</evaluation>

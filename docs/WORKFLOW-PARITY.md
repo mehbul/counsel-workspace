@@ -54,3 +54,9 @@ Automated coverage includes an approval-gated selected-document workflow, immuta
 - [Legora integrations](https://legora.com/product/integrations)
 
 Public descriptions establish advertised features, not private implementation or independently measured behavior.
+
+## Assistant-powered operation added 25 October 2026
+
+The repository now includes a stdio MCP bridge with matter-scoped, expiring and revocable keys. A connected assistant can read evidence and save its own unreviewed drafts, structured reviews and tasks without Counsel calling a model API. Ollama and OpenAI-compatible generation adapters are also available; model APIs require explicit provider selection and are optional. See [ASSISTANTS.md](ASSISTANTS.md).
+
+This supplies a way for an existing assistant to plan and reason using Counsel tools. It does not establish a native autonomous agent or complete the other enterprise, research, portal and Office gaps above. SDK protocol tests pass; actual client registration and live model-quality evaluations remain separate deployment work.

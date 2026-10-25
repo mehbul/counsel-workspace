@@ -40,7 +40,7 @@ async function logout() {
 function account() {
   modal(
     "Your account",
-    `<p>${esc(authState.user.email)} · ${esc(authState.user.role)}</p><button class="secondary" onclick="changePassword()">Change password</button> ${authState.user.role === "owner" ? '<button class="secondary" onclick="manageMembers()">Manage members</button> <button class="secondary" onclick="auditLog()">Audit log</button> <button class="secondary" onclick="matterAccess()">Matter access</button>' : ""}<button class="primary" onclick="$('#modal').close();logout()">Sign out</button>`,
+    `<p>${esc(authState.user.email)} · ${esc(authState.user.role)}</p><button class="secondary" onclick="changePassword()">Change password</button> ${authState.user.role !== "viewer" ? '<button class="secondary" onclick="assistantConnections()">Connect Codex / Claude</button>' : ""} ${authState.user.role === "owner" ? '<button class="secondary" onclick="manageMembers()">Manage members</button> <button class="secondary" onclick="auditLog()">Audit log</button> <button class="secondary" onclick="matterAccess()">Matter access</button>' : ""}<button class="primary" onclick="$('#modal').close();logout()">Sign out</button>`,
   );
 }
 function changePassword() {

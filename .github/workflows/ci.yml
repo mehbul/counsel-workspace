@@ -16,6 +16,7 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm audit --omit=dev --audit-level=high
+      - run: docker compose --env-file .env.example config --quiet
       - run: docker build -t counsel:test .
       - name: Smoke-test hardened container
         run: |

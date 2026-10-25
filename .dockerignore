@@ -6,3 +6,7 @@ test
 workspace-preview.png
 *.db
 *.sqlite
+
+# Assistant connection files contain bearer credentials.
+counsel-connection*.json
+*.connection.private.json

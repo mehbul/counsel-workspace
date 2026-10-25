@@ -9,8 +9,16 @@ services:
       APP_ORIGIN: https://${DOMAIN:?Set DOMAIN in .env}
       COOKIE_SECURE: 'true'
       TRUST_PROXY: '1'
+      AI_PROVIDER: ${AI_PROVIDER:-evidence}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - counsel-data:/data
     read_only: true

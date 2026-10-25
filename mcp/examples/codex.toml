@@ -1,0 +1,3 @@
+[mcp_servers.counsel]
+command = "node"
+args = ["/absolute/path/to/counsel-workspace/mcp/server.mjs", "--connection-file", "/private/path/counsel-connection.json"]

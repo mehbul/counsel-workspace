@@ -15,3 +15,7 @@ test-output/
 !.env.example
 backups/
 coverage/
+
+# Assistant connection files contain bearer credentials.
+counsel-connection*.json
+*.connection.private.json
