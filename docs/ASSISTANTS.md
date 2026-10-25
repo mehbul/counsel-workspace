@@ -57,7 +57,7 @@ The host reads evidence and performs the analysis itself. It can save its result
 
 Results appear in Tabular review, Editor and Lists. Exact-quote checks reject fabricated source references; they do not prove that a legal interpretation is correct. Saved work stays unreviewed.
 
-There are 13 tools: connection information; paginated matter/document/draft lists; bounded source/draft/review reading; keyword evidence search; text import; local extraction review creation; host-authored review and draft saving; and task creation. They do not execute arbitrary code, access arbitrary files, call external model APIs, or reuse assistant-provider login credentials.
+There are 15 tools: connection information; paginated matter/document/draft lists; bounded source/draft/review reading; ranked evidence search; passage comparison and reference-integrity checks; text import; local extraction review creation; host-authored review and draft saving; and task creation. They do not execute arbitrary code, access arbitrary files, call external model APIs, or reuse assistant-provider login credentials.
 
 ## Run a local model in the web app
 
@@ -89,7 +89,7 @@ Remote endpoints require HTTPS. Set `AI_API_KEY` when your chosen service requir
 
 ## Permissions and data boundary
 
-Keys are hashed in SQLite, revealed once, expire within 90 days, and can be revoked through Account. Every call checks key status and intersects its matter scope with the member's current grants. Revoking a matter grant or disabling the member affects subsequent calls. Viewers cannot create keys. Changing a login password does not automatically revoke these separate credentials; revoke unwanted connections explicitly.
+Keys are hashed in SQLite, revealed once, expire within 90 days, and can be revoked through Account. Every call checks key status and intersects its matter scope with the member's current grants. Revoking a matter grant or disabling the member affects subsequent calls. Viewers cannot create keys. Changing or recovering a login password and disabling a member revoke all of that member's assistant keys and sessions. Re-enabling a member does not restore old keys. Reconnect with a new key.
 
 Tool results enter the connected assistant's context under its provider's data policy. A self-hosted database does not make a cloud assistant local. Read-only keys cannot create work. No bridge key can declare an output human-approved.
 

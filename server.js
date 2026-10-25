@@ -197,6 +197,39 @@ require("./agent-api").installAgentApi(app, db, security, save, {
   retrieve,
   createReview,
 });
+require("./comparisons").installComparisons(app, db);
+for (const [route, collection, field] of [
+  ["messages", "messages", "text"],
+  ["drafts", "drafts", "content"],
+])
+  app.get(`/api/${route}/:id/evidence`, (req, res) => {
+    const item = state[collection].find((i) => i.id === req.params.id);
+    if (!item) return res.status(404).json({ error: "Result not found." });
+    const docs = state.documents.filter((d) => d.matterId === item.matterId);
+    res.json(
+      require("./evidence").checkEvidence(
+        item[field],
+        item.citations || [],
+        docs,
+        {
+          mode: item.mode === "Local evidence search" ? "excerpts" : "analysis",
+        },
+      ),
+    );
+  });
+app.get("/api/reviews/:rid/cells/:cid/evidence", (req, res) => {
+  const r = state.reviews.find((r) => r.id === req.params.rid),
+    cell = r?.cells.find((c) => c.id === req.params.cid);
+  if (!cell) return res.status(404).json({ error: "Finding not found." });
+  res.json(
+    require("./evidence").checkEvidence(
+      cell.value,
+      cell.citations || [],
+      state.documents.filter((d) => d.matterId === r.matterId),
+      { mode: "linked_sources" },
+    ),
+  );
+});
 function createServer() {
   const server = require("node:http").createServer(app);
   collaboration.attach(server);
@@ -276,61 +309,14 @@ app.delete("/api/documents/:id", (req, res) => {
   log("Deleted document");
   res.json({ ok: true });
 });
-function retrieve(query, docs) {
-  const words = query.toLowerCase().match(/[a-z]{3,}/g) || [];
-  const stop = new Set([
-    "the",
-    "and",
-    "for",
-    "what",
-    "are",
-    "this",
-    "with",
-    "from",
-    "that",
-    "please",
-    "across",
-    "documents",
-  ]);
-  const synonyms = {
-    renewal: ["renew", "term"],
-    liability: ["liability", "capped", "cap"],
-    law: ["law", "jurisdiction"],
-    assignment: ["assign"],
-    termination: ["terminat", "breach"],
-    confidentiality: ["confidential"],
-    payment: ["fees", "pay", "invoice"],
-  };
-  const keys = [
-    ...new Set(
-      words
-        .filter((w) => !stop.has(w))
-        .flatMap((w) => [w, ...(synonyms[w] || [])]),
-    ),
-  ];
-  return docs
-    .filter((d) => !d.supersededBy)
-    .flatMap((d) =>
-      d.text.split(/\n\s*\n/).map((text, i) => ({
-        documentId: d.id,
-        name: d.name,
-        paragraph: i + 1,
-        text,
-        score: keys.reduce(
-          (n, w) => n + (text.toLowerCase().includes(w) ? 1 : 0),
-          0,
-        ),
-      })),
-    )
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+function retrieve(query, docs, options) {
+  return require("./retrieval").retrieve(query, docs, options);
 }
-async function answer(query, docs, instructions = "") {
-  const citations = retrieve(query + " " + instructions, docs);
+async function answer(query, docs, instructions = "", options = {}) {
+  const citations = retrieve(query, docs, options);
   const config = modelConfiguration();
-  if (config.error) throw Error(config.error);
-  if (config.enabled) {
+  if (config.error && citations.length) throw Error(config.error);
+  if (config.enabled && citations.length) {
     const result = await generate([
       {
         role: "system",
@@ -351,34 +337,55 @@ async function answer(query, docs, instructions = "") {
             .join("\n\n"),
       },
     ]);
-    return { ...result, citations };
+    return {
+      ...result,
+      citations,
+      evidence: require("./evidence").checkEvidence(
+        result.text,
+        citations,
+        docs,
+      ),
+    };
   }
+  const text = citations.length
+    ? "Relevant passages from this matter:\n\n" +
+      citations.map((c, i) => `[${i + 1}] ${c.name}\n${c.text}`).join("\n\n") +
+      "\n\nLocal evidence search. These are source excerpts, not an AI-generated legal opinion."
+    : "No matching evidence found in the selected documents. Try a specific clause or upload relevant documents.";
   return {
-    text: citations.length
-      ? "Relevant passages from this matter:\n\n" +
-        citations
-          .map((c, i) => `[${i + 1}] ${c.name}\n${c.text}`)
-          .join("\n\n") +
-        "\n\nLocal evidence search. These are source excerpts, not an AI-generated legal opinion."
-      : "No matching evidence found in the selected documents. Try a specific clause or upload relevant documents.",
+    text,
     citations,
     mode: "Local evidence search",
+    evidence: require("./evidence").checkEvidence(text, citations, docs, {
+      mode: "excerpts",
+    }),
   };
 }
+
 app.post("/api/chat", async (req, res, next) => {
   try {
     const { matterId, query, documentIds, skillId } = req.body;
     if (!query?.trim())
       return res.status(400).json({ error: "Enter a question." });
+    if (
+      documentIds?.some(
+        (id) =>
+          !state.documents.some((d) => d.id === id && d.matterId === matterId),
+      )
+    )
+      return res.status(404).json({ error: "Selected document not found." });
     const docs = state.documents.filter(
       (d) =>
         d.matterId === matterId &&
-        (!documentIds?.length || documentIds.includes(d.id)),
+        (documentIds !== undefined
+          ? documentIds.includes(d.id)
+          : !d.supersededBy),
     );
     const result = await answer(
       query,
       docs,
       state.skills.find((s) => s.id === skillId)?.instructions || "",
+      { includeSuperseded: documentIds !== undefined },
     );
     const message = {
       id: id(),
@@ -394,12 +401,28 @@ app.post("/api/chat", async (req, res, next) => {
     next(e);
   }
 });
+function validateSelectedSources(matterId, documentIds) {
+  if (
+    documentIds?.some(
+      (sourceId) =>
+        !state.documents.some(
+          (document) =>
+            document.id === sourceId && document.matterId === matterId,
+        ),
+    )
+  ) {
+    const error = Error("Selected document not found.");
+    error.status = 404;
+    throw error;
+  }
+}
 async function createReview(payload, runId) {
   if (runId) {
     const existing = state.reviews.find((r) => r.id === runId);
     if (existing) return existing;
   }
   const { matterId, name, columns, documentIds } = payload;
+  validateSelectedSources(matterId, documentIds);
   if (!columns?.length || columns.length > 12)
     throw Error("Use 1–12 review columns.");
   const review = {
@@ -416,7 +439,9 @@ async function createReview(payload, runId) {
       (documentIds ? documentIds.includes(d.id) : !d.supersededBy),
   )) {
     for (let c = 0; c < columns.length; c++) {
-      const evidence = retrieve(columns[c], [d]).slice(0, 2);
+      const evidence = retrieve(columns[c], [d], {
+        includeSuperseded: documentIds !== undefined,
+      }).slice(0, 2);
       review.cells.push({
         id: id(),
         documentId: d.id,
@@ -460,6 +485,7 @@ async function createDraft(payload, runId) {
     if (existing) return existing;
   }
   const { matterId, title, prompt, documentIds, instructions } = payload;
+  validateSelectedSources(matterId, documentIds);
   const result = await answer(
     prompt || "Summarize governing law, liability and assignment",
     state.documents.filter(
@@ -468,12 +494,15 @@ async function createDraft(payload, runId) {
         (documentIds ? documentIds.includes(d.id) : !d.supersededBy),
     ),
     instructions,
+    { includeSuperseded: documentIds !== undefined },
   );
   const draft = {
     id: runId || id(),
     matterId,
     title: title || "Review memorandum",
     content: result.text,
+    mode: result.mode,
+    evidence: result.evidence,
     citations: result.citations,
     created: new Date().toISOString(),
   };
@@ -565,11 +594,13 @@ app.patch("/api/tasks/:id", (req, res) => {
 });
 app.use((err, req, res, next) => {
   const status =
-    err.type === "entity.too.large"
-      ? 413
-      : err instanceof multer.MulterError
-        ? 400
-        : 500;
+    err.status === 404
+      ? 404
+      : err.type === "entity.too.large"
+        ? 413
+        : err instanceof multer.MulterError
+          ? 400
+          : 500;
   console.error(
     JSON.stringify({ requestId: req.requestId, error: err.name, status }),
   );

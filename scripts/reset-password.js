@@ -28,6 +28,14 @@ const argon2 = require("argon2");
   try {
     db.prepare("UPDATE users SET password=? WHERE id=?").run(encoded, u.id);
     db.prepare("DELETE FROM sessions WHERE user_id=?").run(u.id);
+    if (
+      db
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_tokens'",
+        )
+        .get()
+    )
+      db.prepare("UPDATE agent_tokens SET revoked=1 WHERE user_id=?").run(u.id);
     db.exec("COMMIT");
   } catch (e) {
     db.exec("ROLLBACK");
@@ -35,7 +43,7 @@ const argon2 = require("argon2");
   }
   db.close();
   console.log(
-    "Password reset and all sessions revoked. Remove the private password file.",
+    "Password reset; all sessions and assistant keys revoked. Remove the private password file.",
   );
 })().catch((e) => {
   console.error(e.message);

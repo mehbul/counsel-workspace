@@ -23,6 +23,7 @@ const icons = {
   matters: "▣",
   documents: "▤",
   review: "▦",
+  compare: "⇆",
   editor: "▧",
   workflows: "⌘",
   intake: "↳",
@@ -103,6 +104,7 @@ function render() {
     ["matters", "Matters"],
     ["documents", "Documents"],
     ["review", "Tabular review"],
+    ["compare", "Compare"],
     ["editor", "Editor"],
     ["workflows", "Workflows"],
     ["intake", "Intake"],
@@ -181,11 +183,11 @@ function content() {
               .filter((m) => m.matterId === matterId)
               .map(
                 (m) =>
-                  `<div class="userbubble">${esc(m.query)}</div><article class="answer"><span class="answer-mark">✳</span><div><small>${esc(m.mode)}</small><div class="answertext">${esc(m.text)}</div><div class="citations">${m.citations.map((c, i) => `<button onclick="showDoc('${c.documentId}',${c.paragraph})">[${i + 1}] ${esc(c.name)} ↗</button>`).join("")}</div></div></article>`,
+                  `<div class="userbubble">${esc(m.query)}</div><article class="answer"><span class="answer-mark">✳</span><div><small>${esc(m.mode)}</small><div class="answertext">${esc(m.text)}</div><button class="textbutton" onclick="inspectReferences('messages','${m.id}')">Check references${m.evidence?.status === "needs_review" ? " · Needs attention" : ""}</button><div class="citations">${m.citations.map((c, i) => `<button onclick="showDoc('${c.documentId}',${c.paragraph})">[${i + 1}] ${esc(c.name)} ↗</button>`).join("")}</div></div></article>`,
               )
               .join("")
           : `<div class="chat-empty"><span>✳</span><h1>A second perspective.<br>On your terms.</h1><p>Ask about clauses, compare agreements, or find the evidence.</p><div class="suggestions">${["What are the governing law provisions?", "Compare liability across the agreements", "Find assignment restrictions"].map((q) => `<button onclick="$('#query').value=this.textContent">${q}</button>`).join("")}</div></div>`
-      }</div><form id="chat-form" class="composer"><textarea id="query" required placeholder="Ask about your documents…" aria-label="Your question"></textarea><div><span>▤ ${docs().length} documents</span><select id="skill-select" aria-label="Apply a skill"><option value="">◇ Apply a skill</option>${S.skills.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select><button class="send" aria-label="Send question" ${busy ? "disabled" : ""}>${busy ? "…" : "↑"}</button></div></form><p class="composer-note">${S.aiAvailable ? "Verify generated results against source passages." : "Local mode returns source excerpts. A configured AI provider enables generated analysis."}</p>`;
+      }</div><form id="chat-form" class="composer"><textarea id="query" required placeholder="Ask about your documents…" aria-label="Your question"></textarea><div><button type="button" class="textbutton" onclick="chooseAssistantSources()">▤ ${(chatSourceSelection[matterId] || docs()).length} sources · Choose</button><select id="skill-select" aria-label="Apply a skill"><option value="">◇ Apply a skill</option>${S.skills.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select><button class="send" aria-label="Send question" ${busy ? "disabled" : ""}>${busy ? "…" : "↑"}</button></div></form><p class="composer-note">${S.aiAvailable ? "Verify generated results against source passages." : "Local mode returns source excerpts. A configured AI provider enables generated analysis."}</p>`;
     case "review": {
       const reviews = S.reviews.filter((r) => r.matterId === matterId),
         r = reviews.find((r) => r.id === activeReview) || reviews[0];
@@ -196,33 +198,30 @@ function content() {
           "Every finding connected to evidence.",
           '<button class="primary" onclick="newReview()">＋ New review</button>',
         ) +
-        `<div class="toolbar">${selector()}${r ? `<select id="review-select" aria-label="Select review">${reviews.map((x) => `<option value="${x.id}" ${x.id === r.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select><button class="secondary" onclick="exportReview('${r.id}')">↓ Export CSV</button>` : ""}</div>${
-          r
-            ? `<div class="review-summary"><span class="dot"></span>Extraction complete <span>${r.cells.filter((c) => c.reviewed).length}/${r.cells.length} findings reviewed</span><small>${esc(r.mode || "Local passage extraction")} · select a cell to inspect evidence</small></div><div class="tablewrap"><table class="reviewtable"><thead><tr><th>Document</th>${r.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${[
-                ...new Set(r.cells.map((c) => c.documentId)),
-              ]
-                .map(
-                  (did) =>
-                    `<tr><th><span class="docicon">▤</span>${esc(S.documents.find((d) => d.id === did)?.name || "Deleted document")}</th>${r.columns
-                      .map((_, i) => {
-                        const c = r.cells.find(
-                          (c) => c.documentId === did && c.column === i,
-                        );
-                        return `<td><button class="cell ${c.reviewed ? "reviewed" : ""}" onclick="inspectCell('${r.id}','${c.id}')">${c.reviewed ? '<span class="reviewcheck">✓ Reviewed</span>' : ""}${esc(c.value)}<small>${c.locked ? "▣ Locked" : "↗ " + c.citations.length + " sources"}</small></button></td>`;
-                      })
-                      .join("")}</tr>`,
-                )
-                .join("")}</tbody></table></div>`
-            : empty(
-                "▦",
-                "A clearer view of every document.",
-                "Extract clauses into a comparison table.",
-                "Create review",
-                "newReview()",
-              )
-        }`
+        `<div class="toolbar">${selector()}${r ? `<select id="review-select" aria-label="Select review">${reviews.map((x) => `<option value="${x.id}" ${x.id === r.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select><button class="secondary" onclick="exportReview('${r.id}')">↓ Export all CSV</button>` : ""}</div>` +
+        (r
+          ? reviewPanel(r)
+          : empty(
+              "▦",
+              "A clearer view of every document.",
+              "Extract clauses into a comparison table.",
+              "Create review",
+              "newReview()",
+            ))
       );
     }
+    case "compare":
+      return (
+        heading(
+          "READ THE DIFFERENCES",
+          "Compare documents",
+          "Compare source passages, inspect changed wording, and identify gaps.",
+          editable()
+            ? '<button class="primary" onclick="newComparison()">＋ New comparison</button>'
+            : "",
+        ) +
+        `<div class="toolbar">${selector()}</div><div id="comparison-content">Loading comparisons…</div>`
+      );
     case "editor": {
       const drafts = S.drafts.filter((d) => d.matterId === matterId),
         d = drafts.find((d) => d.id === activeDraft) || drafts[0];
@@ -233,7 +232,7 @@ function content() {
           "Draft together, refine your findings, and export to Word.",
           '<button class="primary" onclick="newDraft()">＋ New draft</button>',
         ) +
-        `<div class="toolbar">${selector()}${d ? `<select id="draft-select" aria-label="Select draft">${drafts.map((x) => `<option value="${x.id}" ${x.id === d.id ? "selected" : ""}>${esc(x.title)}</option>`).join("")}</select><button class="secondary" onclick="saveDraft('${d.id}')">Save title</button><a class="primary" href="/api/drafts/${d.id}/export">↓ Export Word</a>` : ""}</div>${d ? `<div class="editorpaper"><input id="draft-title" value="${esc(d.title)}" aria-label="Draft title"><div class="rich-actions"><button class="secondary" onclick="draftSuggestions('${d.id}')">Proposed edits</button><button class="secondary" onclick="draftComments('${d.id}')">Comments</button><button class="secondary" onclick="draftHistory('${d.id}')">History</button><button class="secondary" onclick="CounselCollab.undo()">↶ Undo</button><button class="secondary" onclick="CounselCollab.redo()">↷ Redo</button></div><div id="draft-content"></div><small id="collaboration-status">Connecting to shared draft…</small></div>` : empty("▧", "Room for your next great argument.", "Create a draft from your matter documents.", "Create draft", "newDraft()")}`
+        `<div class="toolbar">${selector()}${d ? `<select id="draft-select" aria-label="Select draft">${drafts.map((x) => `<option value="${x.id}" ${x.id === d.id ? "selected" : ""}>${esc(x.title)}</option>`).join("")}</select><button class="secondary" onclick="saveDraft('${d.id}')">Save title</button><a class="primary" href="/api/drafts/${d.id}/export">↓ Export Word</a>` : ""}</div>${d ? `<div class="editorpaper"><input id="draft-title" value="${esc(d.title)}" aria-label="Draft title"><div class="rich-actions"><button class="secondary" onclick="inspectReferences('drafts','${d.id}')">Check references</button><button class="secondary" onclick="draftSuggestions('${d.id}')">Proposed edits</button><button class="secondary" onclick="draftComments('${d.id}')">Comments</button><button class="secondary" onclick="draftHistory('${d.id}')">History</button><button class="secondary" onclick="CounselCollab.undo()">↶ Undo</button><button class="secondary" onclick="CounselCollab.redo()">↷ Redo</button></div><div id="draft-content"></div><small id="collaboration-status">Connecting to shared draft…</small></div>` : empty("▧", "Room for your next great argument.", "Create a draft from your matter documents.", "Create draft", "newDraft()")}`
       );
     }
     case "workflows":
@@ -470,7 +469,7 @@ function inspectCell(rid, cid) {
     c = r.cells.find((c) => c.id === cid);
   modal(
     esc(r.columns[c.column]),
-    `<div class="evidencepanel"><div class="source-meta">${esc(S.documents.find((d) => d.id === c.documentId)?.name)} · ${c.reviewed ? "REVIEWED" : "NEEDS REVIEW"}</div><label>Finding<textarea id="cellvalue" ${c.locked ? "disabled" : ""}>${esc(c.value)}</textarea></label><div class="cell-actions"><button class="secondary" onclick="changeCell('${rid}','${cid}',{reviewed:${!c.reviewed}})">${c.reviewed ? "Unmark reviewed" : "✓ Mark reviewed"}</button><button class="secondary" onclick="changeCell('${rid}','${cid}',{locked:${!c.locked}})">${c.locked ? "Unlock cell" : "Lock cell"}</button><button class="primary" ${c.locked ? "disabled" : ""} onclick="changeCell('${rid}','${cid}',{value:$('#cellvalue').value})">Save finding</button></div><h3>Source evidence</h3>${c.citations.map((e) => `<blockquote>${esc(e.text)}<button class="textbutton" onclick="showDoc('${e.documentId}',${e.paragraph})">Open paragraph ${e.paragraph} ↗</button></blockquote>`).join("") || "<p>No supporting passage found.</p>"}</div>`,
+    `<div class="evidencepanel"><div class="source-meta">${esc(S.documents.find((d) => d.id === c.documentId)?.name)} · ${c.reviewed ? "REVIEWED" : "NEEDS REVIEW"}</div><label>Finding<textarea id="cellvalue" ${c.locked ? "disabled" : ""}>${esc(c.value)}</textarea></label><div class="cell-actions"><button class="secondary" onclick="changeCell('${rid}','${cid}',{reviewed:${!c.reviewed}})">${c.reviewed ? "Unmark reviewed" : "✓ Mark reviewed"}</button><button class="secondary" onclick="changeCell('${rid}','${cid}',{locked:${!c.locked}})">${c.locked ? "Unlock cell" : "Lock cell"}</button><button class="primary" ${c.locked ? "disabled" : ""} onclick="changeCell('${rid}','${cid}',{value:$('#cellvalue').value})">Save finding</button></div><button class="secondary" onclick="inspectReferences('review-cell','${rid}','${cid}')">Check source references</button><h3>Source evidence</h3>${c.citations.map((e) => `<blockquote>${esc(e.text)}<button class="textbutton" onclick="showDoc('${e.documentId}',${e.paragraph})">Open paragraph ${e.paragraph} ↗</button></blockquote>`).join("") || "<p>No supporting passage found.</p>"}</div>`,
   );
 }
 async function changeCell(rid, cid, body) {
@@ -547,7 +546,12 @@ async function send(query, skillId) {
   busy = true;
   render();
   try {
-    await api("chat", { matterId, query, skillId });
+    await api("chat", {
+      matterId,
+      query,
+      skillId,
+      documentIds: chatSourceSelection[matterId],
+    });
     await refresh();
   } catch (e) {
     toast(e.message);
@@ -562,6 +566,7 @@ function uploadDocuments() {
   $("#upload")?.click();
 }
 function bind() {
+  if (view === "compare") loadComparisons();
   if (["workflows", "intake", "monitors"].includes(view)) loadWorkflowViews();
   if (view === "integrations") loadConnectors();
   if (view === "editor" && $("#draft-content")) {

@@ -26,13 +26,21 @@ const definitions = {
     "Find paragraph-level evidence with local keyword search. This does not call a language model or external legal database.",
     true,
   ],
+  compare_documents: [
+    "Compare matching source passages across two to four authorized documents for up to six questions. Returns quote coverage and a wording diff of the first two matches. Missing matches do not prove a clause is absent. No model call or legal-risk inference.",
+    true,
+  ],
+  check_evidence: [
+    "Check exact source quotations, numbered references and uncited passages in text against authorized sources. Returns reference integrity issues; this is not legal or semantic validation. No model call.",
+    true,
+  ],
   list_drafts: [
     "List existing drafts in an authorized matter. Paginated.",
     true,
   ],
   read_draft: ["Read a saved draft in bounded character ranges.", true],
   read_review: [
-    "Read a saved review and its source citations. Cell results are local extraction, not legal conclusions.",
+    "Read a saved review and its source citations. Results may be local extraction or host-authored analysis; inspect the review mode and sources. Results remain unreviewed until a human review decision.",
     true,
   ],
   import_text: [

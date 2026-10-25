@@ -91,6 +91,8 @@ function createCollaboration(db, security, save) {
       } catch {
         return ws.close(1008, "Invalid message");
       }
+      if (!message || typeof message !== "object" || Array.isArray(message))
+        return ws.close(1008, "Invalid message");
       if (message.type === "sync") {
         send(ws, {
           type: "sync",

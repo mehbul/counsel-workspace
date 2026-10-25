@@ -152,7 +152,8 @@ function installAgentApi(app, db, security, save, tools) {
     "/agent/v1/:operation",
     wrap(async (req, res) => {
       const op = req.params.operation;
-      if (!shapes[op]) throw fail(404, "Unknown assistant operation.");
+      if (!Object.hasOwn(shapes, op))
+        throw fail(404, "Unknown assistant operation.");
       const first = lookup(req),
         b = shapes[op].parse(req.body);
       if (writes.has(op) && first.mode !== "write")
@@ -165,6 +166,8 @@ function installAgentApi(app, db, security, save, tools) {
             c = context.getStore(),
             allowed = new Set(JSON.parse(token.matter_ids)),
             matters = c.state.matters.filter((m) => allowed.has(m.id));
+          if (writes.has(op) && token.mode !== "write")
+            throw fail(403, "This assistant key has read-only access.");
           if (b.matterId && !matters.some((m) => m.id === b.matterId))
             throw fail(
               404,
@@ -297,7 +300,9 @@ function installAgentApi(app, db, security, save, tools) {
           if (op === "search")
             output = {
               citations: tools
-                .retrieve(b.query, selected(b.documentIds))
+                .retrieve(b.query, selected(b.documentIds), {
+                  includeSuperseded: b.documentIds !== undefined,
+                })
                 .map((c) => ({
                   ...c,
                   text: c.text.slice(0, 3000),
@@ -305,6 +310,27 @@ function installAgentApi(app, db, security, save, tools) {
                 })),
               mode: "Local keyword evidence retrieval; no model call.",
             };
+          if (op === "compare_documents") {
+            if (new Set(b.documentIds).size !== b.documentIds.length)
+              throw fail(400, "Select distinct source documents.");
+            output = require("./comparisons").compareDocuments(
+              selected(b.documentIds),
+              b.questions,
+              tools.retrieve,
+            );
+          }
+          if (op === "check_evidence") {
+            selected(b.citations.map((c) => c.documentId));
+            output = require("./evidence").checkEvidence(
+              b.text,
+              b.citations.map((r) => ({
+                documentId: r.documentId,
+                paragraph: r.paragraph,
+                text: r.quote,
+              })),
+              docs,
+            );
+          }
           if (op === "list_drafts")
             output = paginate(
               c.state.drafts
@@ -320,6 +346,11 @@ function installAgentApi(app, db, security, save, tools) {
             output = {
               id: d.id,
               title: d.title,
+              mode:
+                d.mode ||
+                (d.origin === "connected-assistant"
+                  ? "Host assistant analysis"
+                  : "Unspecified; inspect the content and its sources."),
               content: d.content.slice(b.offset, b.offset + b.limit),
               characters: d.content.length,
               nextOffset:
@@ -336,6 +367,7 @@ function installAgentApi(app, db, security, save, tools) {
             output = {
               id: r.id,
               name: r.name,
+              mode: r.mode || "Local passage extraction",
               columns: r.columns,
               ...paginate(
                 r.cells.map((cell) => ({

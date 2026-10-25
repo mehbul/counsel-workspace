@@ -20,15 +20,17 @@ Open http://127.0.0.1:3000. The service binds to loopback. SQLite data is stored
 ## Features
 
 - Persistent matter creation, document import, text viewing, search and deletion.
-- Matter-scoped assistant with clickable paragraph references.
-- Review tables with prompt columns, evidence inspection, editable findings, locks and review status; CSV export.
+- Matter-scoped ranked passage search, explicit source selection and clickable paragraph references.
+- Persisted document comparisons with source coverage, highlighted passage changes and CSV export.
+- Reference-integrity reports that check exact quotes and flag missing sources or uncited output paragraphs.
+- Review tables with prompt columns, evidence inspection, editable findings, locks, review status, filtering, sorting and pagination; CSV export.
 - Editable drafting workspace and real DOCX export.
 - Reusable instructions, three executable workflow templates, task lists and activity history.
 - MCP tools for scoped evidence reading and host-authored drafts, review tables and tasks, with expiring/revocable read or write keys.
 - Optional local Ollama or OpenAI-compatible model generation; explicit provider selection prevents accidental API usage.
 - Responsive layout and accessible native forms/dialogs.
 
-Evidence-only mode uses deterministic passage search, including basic clause synonym matching. Its review tables extract matching passages and its drafts compile source excerpts. Connected assistants can instead reason over those sources and save their own unreviewed analyses, without Counsel making model API calls. No external legal-research corpus or case-law verification is included.
+Evidence-only mode uses deterministic BM25-style passage ranking, legal-concept aliases, document diversity and bounded exact-quote windows. Its review tables extract matching passages and its drafts compile source excerpts. Connected assistants can instead reason over those sources and save their own unreviewed analyses, without Counsel making model API calls. No external legal-research corpus or case-law verification is included.
 
 ## Optional generated analysis
 
@@ -46,9 +48,10 @@ This optional path sends the question and retrieved passages to OpenAI and may i
 
 ```sh
 npm test
+npm run benchmark
 ```
 
-Integration tests use isolated in-memory databases and temporary data directories. They verify import, scoped citations, extraction, locks, edits and DOCX export.
+Integration tests use isolated in-memory databases and temporary data directories. They verify import, scoped citations, comparisons, reference checks, source selection, extraction, locks, edits, collaboration, security regressions and DOCX export. See [quality checks and measured limits](docs/QUALITY.md) for the synthetic retrieval baseline and live assistant acceptance test.
 
 ## Self-hosted deployment
 

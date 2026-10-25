@@ -37,6 +37,20 @@ const schemas = {
       documentIds: z.array(z.string().uuid()).max(100).optional(),
     })
     .strict(),
+  compare_documents: z
+    .object({
+      matterId: z.string().uuid(),
+      documentIds: z.array(z.string().uuid()).min(2).max(4),
+      questions: z.array(text(500)).min(1).max(6),
+    })
+    .strict(),
+  check_evidence: z
+    .object({
+      matterId: z.string().uuid(),
+      text: z.string().max(200000),
+      citations: z.array(cite).max(100),
+    })
+    .strict(),
   list_drafts: z.object({ matterId: z.string().uuid(), ...page }).strict(),
   read_draft: z
     .object({

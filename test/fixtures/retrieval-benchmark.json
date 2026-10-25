@@ -1,0 +1,164 @@
+{
+  "description": "Synthetic retrieval regression cases designed alongside this implementation. Not held out, not representative legal accuracy, and not a Legora comparison.",
+  "documents": [
+    {
+      "id": "admin",
+      "name": "Administrative notes",
+      "text": "The lawyer reviewed a timesheet.\n\nCapability planning should continue after the workshop.\n\nReassignment of keyboard shortcuts is permitted.\n\nThe invitation lists a venue for the annual staff dinner."
+    },
+    {
+      "id": "nda",
+      "name": "Mutual NDA",
+      "text": "MUTUAL NON-DISCLOSURE AGREEMENT\n\n1. Confidentiality. Recipients must protect confidential business information.\n\n2. Term. This arrangement lasts two years.\n\n3. Governing law. This agreement is governed by the laws of England and Wales.\n\n4. Assignment. Neither party may assign the agreement without prior written consent.\n\n5. Liability. Liability is capped at GBP 500,000."
+    },
+    {
+      "id": "supplier",
+      "name": "Supplier terms",
+      "text": "SUPPLIER TERMS\n\n1. Transfer. The supplier may transfer this arrangement only with prior written permission.\n\n2. Billing. A monthly fee of GBP 250 is due within ten days.\n\n3. Ending the relationship. Either party may cancel the arrangement after thirty days.\n\n4. Extension. The arrangement extends for a further year unless a party objects.\n\n5. Governing law. The arrangement is governed by the laws of New York."
+    },
+    {
+      "id": "dpa",
+      "name": "Data processing addendum",
+      "text": "DATA PROCESSING ADDENDUM\n\n1. Security. The processor will encrypt personal data during storage and transmission.\n\n2. Incident notification. The processor must report a personal data breach within 48 hours.\n\n3. Subprocessors. A new subprocessor requires 30 days prior notice.\n\n4. Erasure. The processor must delete personal data within thirty days of termination."
+    },
+    {
+      "id": "services",
+      "name": "Services agreement",
+      "text": "SERVICES AGREEMENT\n\n1. Liability cap. Aggregate liability shall not exceed fees paid in the preceding twelve months.\n\n2. Renewal. The contract renews automatically unless a party gives sixty days notice.\n\n3. Audit. The customer may inspect the supplier's compliance records once a year.\n\n4. Insurance. The supplier shall maintain professional liability insurance of GBP 2 million."
+    }
+  ],
+  "cases": [
+    {
+      "id": "specific-law",
+      "query": "governing law",
+      "documents": ["admin", "nda"],
+      "relevant": ["nda:4"]
+    },
+    {
+      "id": "specific-cap",
+      "query": "liability cap",
+      "documents": ["admin", "services"],
+      "relevant": ["services:2"]
+    },
+    {
+      "id": "assignment-variant",
+      "query": "assignment restrictions",
+      "documents": ["supplier"],
+      "relevant": ["supplier:2"]
+    },
+    {
+      "id": "payment-variant",
+      "query": "payment",
+      "documents": ["supplier"],
+      "relevant": ["supplier:3"]
+    },
+    {
+      "id": "termination-variant",
+      "query": "termination",
+      "documents": ["supplier"],
+      "relevant": ["supplier:4"]
+    },
+    {
+      "id": "renewal-variant",
+      "query": "renewal",
+      "documents": ["supplier"],
+      "relevant": ["supplier:5"]
+    },
+    {
+      "id": "jurisdiction-variant",
+      "query": "jurisdiction",
+      "documents": ["supplier"],
+      "relevant": ["supplier:6"]
+    },
+    {
+      "id": "invoice-variant",
+      "query": "invoices",
+      "documents": ["supplier"],
+      "relevant": ["supplier:3"]
+    },
+    {
+      "id": "cancellation-variant",
+      "query": "cancellation",
+      "documents": ["supplier"],
+      "relevant": ["supplier:4"]
+    },
+    {
+      "id": "erasure-variant",
+      "query": "retention",
+      "documents": ["dpa"],
+      "relevant": ["dpa:5"]
+    },
+    {
+      "id": "inspection-variant",
+      "query": "inspection",
+      "documents": ["services"],
+      "relevant": ["services:4"]
+    },
+    {
+      "id": "subprocessor-plural",
+      "query": "subcontracting",
+      "documents": ["dpa"],
+      "relevant": ["dpa:4"]
+    },
+    {
+      "id": "confidentiality",
+      "query": "confidentiality",
+      "documents": ["nda"],
+      "relevant": ["nda:2"]
+    },
+    {
+      "id": "renewal-exact",
+      "query": "renewal notice",
+      "documents": ["services"],
+      "relevant": ["services:3"]
+    },
+    {
+      "id": "liability-specific",
+      "query": "liability",
+      "documents": ["nda"],
+      "relevant": ["nda:6"]
+    },
+    {
+      "id": "incident-exact",
+      "query": "incident notification",
+      "documents": ["dpa"],
+      "relevant": ["dpa:3"]
+    },
+    {
+      "id": "missing-arbitration",
+      "query": "arbitration venue",
+      "documents": ["admin", "nda", "supplier"],
+      "relevant": []
+    },
+    {
+      "id": "missing-law-substring",
+      "query": "law",
+      "documents": ["admin"],
+      "relevant": []
+    },
+    {
+      "id": "missing-cap-substring",
+      "query": "cap",
+      "documents": ["admin"],
+      "relevant": []
+    },
+    {
+      "id": "missing-assignment-substring",
+      "query": "assignment",
+      "documents": ["admin"],
+      "relevant": []
+    },
+    {
+      "id": "missing-force-majeure",
+      "query": "force majeure",
+      "documents": ["nda", "services", "dpa"],
+      "relevant": []
+    },
+    {
+      "id": "missing-patent",
+      "query": "patent royalties",
+      "documents": ["nda", "supplier"],
+      "relevant": []
+    }
+  ]
+}

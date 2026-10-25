@@ -140,6 +140,19 @@ function installSecurity(app, db, initial) {
         resource,
         new Date().toISOString(),
       );
+  function revokeAssistantKeys(userId) {
+    // Older databases may predate the optional assistant integration.
+    if (
+      db
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_tokens'",
+        )
+        .get()
+    )
+      db.prepare("UPDATE agent_tokens SET revoked=1 WHERE user_id=?").run(
+        userId,
+      );
+  }
   const cookie = (res, value, age) =>
     res.cookie("counsel_session", value, {
       httpOnly: true,
@@ -307,9 +320,26 @@ function installSecurity(app, db, initial) {
           .status(403)
           .json({ error: "Current password is incorrect." });
       const password = await argon2.hash(b.password);
-      db.prepare("UPDATE users SET password=? WHERE id=?").run(password, u.id);
-      db.prepare("DELETE FROM sessions WHERE user_id=?").run(u.id);
-      audit(u.workspace_id, u.id, "password.changed");
+      // Hashing yields: a logout, disable or competing password change may
+      // have revoked the request's session while the expensive work ran.
+      if (!session(req))
+        return res
+          .status(401)
+          .json({ error: "Session revoked. Sign in again." });
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("UPDATE users SET password=? WHERE id=?").run(
+          password,
+          u.id,
+        );
+        db.prepare("DELETE FROM sessions WHERE user_id=?").run(u.id);
+        revokeAssistantKeys(u.id);
+        audit(u.workspace_id, u.id, "password.changed");
+        db.exec("COMMIT");
+      } catch (e) {
+        db.exec("ROLLBACK");
+        throw e;
+      }
       res.json({ csrf: newSession(res, u) });
     }),
   );
@@ -342,6 +372,15 @@ function installSecurity(app, db, initial) {
           .status(409)
           .json({ error: "Unable to create that account." });
       const password = await argon2.hash(b.password);
+      const active = session(req);
+      if (!active || active.role !== "owner")
+        return res
+          .status(401)
+          .json({ error: "Session revoked. Sign in again." });
+      if (db.prepare("SELECT id FROM users WHERE email=?").get(b.email))
+        return res
+          .status(409)
+          .json({ error: "Unable to create that account." });
       db.prepare("INSERT INTO users VALUES(?,?,?,?,?,0)").run(
         randomUUID(),
         b.email,
@@ -364,17 +403,25 @@ function installSecurity(app, db, initial) {
         return res
           .status(404)
           .json({ error: "Member not found or protected." });
-      db.prepare("UPDATE users SET disabled=? WHERE id=?").run(
-        b.disabled ? 1 : 0,
-        u.id,
-      );
-      db.prepare("DELETE FROM sessions WHERE user_id=?").run(u.id);
-      audit(
-        req.user.workspace_id,
-        req.user.id,
-        b.disabled ? "member.disabled" : "member.enabled",
-        u.id,
-      );
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("UPDATE users SET disabled=? WHERE id=?").run(
+          b.disabled ? 1 : 0,
+          u.id,
+        );
+        db.prepare("DELETE FROM sessions WHERE user_id=?").run(u.id);
+        if (b.disabled) revokeAssistantKeys(u.id);
+        audit(
+          req.user.workspace_id,
+          req.user.id,
+          b.disabled ? "member.disabled" : "member.enabled",
+          u.id,
+        );
+        db.exec("COMMIT");
+      } catch (e) {
+        db.exec("ROLLBACK");
+        throw e;
+      }
       res.json({ ok: true });
     }),
   );
@@ -608,11 +655,14 @@ const schemas = {
     matterId: z.string().uuid(),
     name: z.string().max(200).optional(),
     columns: z.array(text(500)).min(1).max(12),
+    documentIds: z.array(z.string().uuid()).max(100).optional(),
   }),
   "POST /drafts": z.object({
     matterId: z.string().uuid(),
     title: z.string().max(200).optional(),
     prompt: z.string().max(20000).optional(),
+    documentIds: z.array(z.string().uuid()).max(100).optional(),
+    instructions: z.string().max(20000).optional(),
   }),
   "POST /skills": z.object({
     name: text(200),

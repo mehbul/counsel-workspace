@@ -1390,3 +1390,111 @@ aside {
     flex-wrap: wrap;
   }
 }
+.comparison-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+  color: var(--muted);
+}
+.comparison-meta button {
+  padding: 8px 12px;
+}
+.comparison-section {
+  padding: 10px 0 28px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.comparison-source {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+.comparison-source h3 {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.comparison-source blockquote {
+  margin: 15px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+.comparison-source blockquote button {
+  display: block;
+  margin-top: 8px;
+}
+.missing-evidence {
+  background: #f8f2e6;
+  color: #785e2e;
+  padding: 16px;
+  border-radius: 6px;
+  line-height: 1.7;
+}
+.comparison-diff {
+  background: #f3f5f0;
+  padding: 16px 20px;
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.comparison-diff summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.comparison-diff > div {
+  white-space: pre-wrap;
+  line-height: 1.9;
+  margin-top: 18px;
+}
+.comparison-diff ins {
+  background: #dcebdd;
+  color: #244b33;
+  text-decoration: none;
+}
+.comparison-diff del {
+  background: #f5dddb;
+  color: #913f37;
+}
+.reference-status {
+  padding: 15px;
+  background: #faf0da;
+  border-radius: 6px;
+  color: #795923;
+}
+.reference-status.matched {
+  background: var(--mint);
+  color: var(--green);
+}
+.reference-stats {
+  display: flex;
+  gap: 12px;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.review-filterbar {
+  flex-wrap: wrap;
+}
+.review-filterbar input {
+  min-width: 200px;
+  flex: 1;
+}

@@ -122,6 +122,12 @@ test("MCP connects over stdio; scoped evidence and host-written drafts require n
     assert.ok(
       tools.find((t) => t.name === "counsel_search").annotations.readOnlyHint,
     );
+    for (const name of ["compare_documents", "check_evidence"])
+      assert.equal(
+        tools.find((t) => t.name === "counsel_" + name).annotations
+          .readOnlyHint,
+        true,
+      );
     assert.equal(
       tools.find((t) => t.name === "counsel_create_draft").annotations
         .readOnlyHint,
@@ -153,6 +159,93 @@ test("MCP connects over stdio; scoped evidence and host-written drafts require n
     });
     assert.ok(searched.data.citations.length);
     const evidence = searched.data.citations[0];
+    const compareInput = {
+      matterId: mid,
+      documentIds: [doc.id, state.documents[1].id],
+      questions: ["Governing law", "Arbitration"],
+    };
+    const comparison = await call("compare_documents", compareInput);
+    assert.equal(comparison.data.rows[0].coverage.matched, 2);
+    assert.equal(comparison.data.rows[1].coverage.matched, 0);
+    assert.equal(comparison.data.rows[1].diff, null);
+    assert.match(comparison.data.notice, /No match does not establish/);
+    assert.equal(
+      (await direct(readKey.token, "compare_documents", compareInput)).status,
+      200,
+    );
+    assert.equal(
+      db.prepare("SELECT COUNT(*) n FROM document_comparisons").get().n,
+      0,
+    );
+    assert.equal(
+      (
+        await direct(readKey.token, "compare_documents", {
+          ...compareInput,
+          documentIds: [doc.id, doc.id],
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await direct(readKey.token, "compare_documents", {
+          ...compareInput,
+          matterId: hidden.id,
+        })
+      ).status,
+      404,
+    );
+    const checkInput = {
+      matterId: mid,
+      text: "The source states: " + evidence.text + " [1].",
+      citations: [
+        {
+          documentId: doc.id,
+          paragraph: evidence.paragraph,
+          quote: evidence.text,
+        },
+      ],
+    };
+    const checked = await call("check_evidence", checkInput);
+    assert.equal(checked.data.status, "references_valid");
+    assert.equal(checked.data.validCitationCount, 1);
+    assert.match(checked.data.limitation, /does not establish/i);
+    assert.equal(
+      (await direct(readKey.token, "check_evidence", checkInput)).status,
+      200,
+    );
+    const forged = await call("check_evidence", {
+      ...checkInput,
+      citations: [
+        {
+          documentId: doc.id,
+          paragraph: evidence.paragraph,
+          quote: "Invented legal quotation",
+        },
+      ],
+    });
+    assert.equal(forged.data.status, "needs_review");
+    assert.ok(forged.data.issues.some((i) => i.code === "quote_mismatch"));
+    assert.equal(
+      (
+        await direct(readKey.token, "check_evidence", {
+          ...checkInput,
+          citations: [
+            { documentId: randomUUID(), paragraph: 1, quote: "No access" },
+          ],
+        })
+      ).status,
+      404,
+    );
+    assert.equal(
+      (
+        await direct(readKey.token, "check_evidence", {
+          ...checkInput,
+          matterId: hidden.id,
+        })
+      ).status,
+      404,
+    );
     const body = {
       matterId: mid,
       requestId: randomUUID(),
