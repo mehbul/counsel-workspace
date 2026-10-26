@@ -30,8 +30,8 @@ accurate, or equivalent to a commercial product.
 - [x] Enable GitHub private vulnerability reporting.
 - [x] Enable GitHub Discussions or document that issues are the support channel.
 - [x] Enable secret scanning, push protection and Dependabot security updates.
-- [ ] Add `good first issue` and `help wanted` labels and seed a few scoped
-      issues.
+- [x] Add `good first issue` and `help wanted` labels and seed a few scoped
+      issues (#4, #5, #6).
 - [ ] Confirm the Code of Conduct contact route works without exposing personal
       data.
 

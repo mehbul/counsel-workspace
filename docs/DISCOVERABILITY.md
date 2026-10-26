@@ -23,18 +23,19 @@ Canonical URL: `https://mehbul.github.io/counsel-workspace/`
 
 ## GitHub metadata
 
-Description:
+Description (as set on 26 October 2026):
 
-> Free, self-hosted legal workspace for contract review, legal research,
-> drafting, workflows and matter collaboration. No Legora subscription and no
-> mandatory model API.
+> Free, self-hosted, Apache-2.0 legal workspace for contract review, research,
+> drafting and matter collaboration. An independent, open alternative to
+> Legora.
 
-Topics:
+Topics (20, as set):
 
-`legal-tech`, `legal-ai`, `legora-alternative`, `self-hosted`,
-`contract-review`, `document-review`, `legal-research`, `matter-management`,
-`mcp`, `model-context-protocol`, `privacy`, `local-first`, `ai-agents`,
-`claude`, `codex`, `openai`, `ollama`, `legal-documents`, `docx`, `pdf`
+`access-to-justice`, `apache-license`, `artificial-intelligence`,
+`contract-review`, `contracts`, `law-firms`, `legal-ai`, `legal-aid`,
+`legal-research`, `legal-software`, `legal-workspace`, `legaltech`, `llm`,
+`mcp`, `nodejs`, `open-source`, `self-hosted`, `sqlite`,
+`legora-alternative`, `solo-lawyers`
 
 README keywords to keep visible: free, self-hosted, open source, legal
 workspace, contract review, legal research, drafting, matter management, MCP,
@@ -82,6 +83,19 @@ using the project. Those tactics damage trust and can violate platform rules.
 - Referrers from search, GitHub, AI assistants, and launch posts.
 - Review the baseline after two weeks and update the content that actually
   brings qualified visitors.
+
+### Recorded baseline
+
+Recorded on 26 October 2026, the public launch day, so future changes are
+measured against something concrete. These numbers say nothing about product
+quality and are not used as marketing claims.
+
+- Stars: 0. Forks: 0. Watchers/subscribers: 0. Open issues: 3 (the seeded
+  scoped issues); 1 pull request merged (`#3`).
+- Repository traffic (14-day window starts at zero): views 0, unique visitors
+  0, clones 0, referrers none, popular paths none.
+- Search Console, directory submissions, and launch posts have not been
+  submitted yet; they require the maintainer's own accounts and verification.
 
 ## Maintenance
 
