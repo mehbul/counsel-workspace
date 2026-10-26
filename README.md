@@ -22,11 +22,12 @@ For an authenticated shared installation, run `npm start` or use Docker. Team da
 ## Features
 
 - Persistent matter creation, document import, text viewing, search and deletion.
-- Matter-scoped ranked passage search, explicit source selection and clickable paragraph references.
-- Persisted document comparisons with source coverage, highlighted passage changes and CSV export.
+- Matter-scoped ranked passage search with deterministic clause anchors, optional semantic candidates and clickable paragraph references.
+- Persisted document comparisons with source coverage, highlighted passage changes, CSV export and DOCX revision export.
 - Reference-integrity reports that check exact quotes and flag missing sources or uncited output paragraphs.
+- Original-file retention, exact page and paragraph anchors, OCR-needed reporting and source-version provenance.
 - Review tables with prompt columns, evidence inspection, editable findings, locks, review status, filtering, sorting and pagination; CSV export.
-- Editable drafting workspace and real DOCX export.
+- Editable drafting workspace, real DOCX export and tracked insertion through the Office task-pane bridge.
 - Reusable instructions, three executable workflow templates, task lists and activity history.
 - Optional independent approval and distinct-reviewer quorum, revalidated before later workflow actions.
 - A guest-only client portal with explicit document and reviewed-text publication and revocation.
@@ -35,7 +36,7 @@ For an authenticated shared installation, run `npm start` or use Docker. Team da
 - Optional local Ollama or OpenAI-compatible model generation; explicit provider selection prevents accidental API usage.
 - Responsive layout and accessible native forms/dialogs.
 
-Evidence-only mode uses deterministic BM25-style passage ranking, legal-concept aliases, document diversity and bounded exact-quote windows. Its review tables extract matching passages and its drafts compile source excerpts. Connected assistants can instead reason over those sources and save their own unreviewed analyses, without Counsel making model API calls. Public Federal Register publication research is available separately. Comprehensive legal research and case-law treatment verification remain incomplete.
+Evidence-only mode uses deterministic clause-level anchors, metadata extraction, BM25-style passage ranking, legal-concept aliases, document diversity, exact source offsets and conservative abstention. Its review tables extract matching passages and its drafts compile source excerpts. Connected assistants can instead reason over those sources and save their own unreviewed analyses, without Counsel making model API calls. Public Federal Register publication research is available separately. Comprehensive legal research and case-law treatment verification remain incomplete.
 
 ## Optional generated analysis
 
@@ -54,9 +55,11 @@ This optional path sends the question and retrieved passages to OpenAI and may i
 ```sh
 npm test
 npm run benchmark
+npm run build
+npm run format:check
 ```
 
-Integration tests use isolated in-memory databases and temporary data directories. They verify import, scoped citations, comparisons, reference checks, source selection, extraction, locks, edits, collaboration, security regressions and DOCX export. See [quality checks and measured limits](docs/QUALITY.md) and the [external CUAD evaluation](docs/LEGAL-EVALUATION.md) for measured results, including poor baseline extraction and abstention.
+Integration tests use isolated in-memory databases and temporary data directories. They verify import, scoped citations, comparisons, reference checks, source selection, extraction, locks, edits, collaboration, security regressions and DOCX export. See [quality checks and measured limits](docs/QUALITY.md) and the [external CUAD evaluation](docs/LEGAL-EVALUATION.md) for measured results, including the document-disjoint development and validation scores. The validation score is materially below development and is not a Legora comparison.
 
 ## Self-hosted deployment
 
@@ -64,7 +67,7 @@ See [deployment and operations](docs/OPERATIONS.md) for Docker Compose, HTTPS, i
 
 ## Boundaries
 
-Authentication, workspace isolation, matter grants, local accounts, revocable sessions, owner-managed members, persisted background review/draft jobs and audit records are implemented. This remains a single-instance foundation, not an independently audited production equivalent of Legora. Licensed research, OCR, Office add-ins, full DMS permission synchronization and monitoring are still missing. Rich-text Yjs collaboration, comments, checkpoints and Microsoft/Google snapshot connectors are implemented; see docs/COLLABORATION-AND-CONNECTORS.md. Extracted text is stored rather than original-file layout. Review tables still use deterministic passage extraction; generated assistant/draft analysis requires a configured provider. Read the operations document before deployment.
+Authentication, workspace isolation, matter grants, local accounts, revocable sessions, owner-managed members, persisted background review/draft jobs and audit records are implemented. This remains a single-instance foundation, not an independently audited production equivalent of Legora. Licensed research, OCR, tenant-installed Office add-ins, full DMS permission synchronization and monitoring are still missing. Rich-text Yjs collaboration, comments, checkpoints, Microsoft/Google snapshot connectors and an Office task-pane bridge are implemented; see docs/COLLABORATION-AND-CONNECTORS.md and docs/OFFICE.md. Extracted text is stored rather than original-file layout. Review tables still use deterministic passage extraction; generated assistant/draft analysis requires a configured provider. Read the operations document before deployment.
 
 ## Workflow orchestration
 
