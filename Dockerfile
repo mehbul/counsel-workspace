@@ -1,11 +1,11 @@
-FROM node:24.20.0-bookworm-slim AS build
+FROM node:26.12.1-bookworm-slim AS build
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY client ./client
 RUN npm run build
 
-FROM node:24.20.0-bookworm-slim
+FROM node:26.12.1-bookworm-slim
 ARG VERSION=0.1.0
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Counsel workspace" \
