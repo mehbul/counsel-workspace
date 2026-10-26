@@ -30,10 +30,5 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-extended
-          # Test scaffolding by design reads local fixture tokens and writes
-          # ephemeral connection files for loopback servers; scanning it
-          # produces recurring file-to-HTTP false positives, so production
-          # code only.
-          paths-ignore: |
-            test
+          config-file: ./.github/codeql-config.yml
       - uses: github/codeql-action/analyze@v4

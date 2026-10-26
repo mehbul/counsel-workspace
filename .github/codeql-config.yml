@@ -1,0 +1,6 @@
+name: "Counsel workspace CodeQL configuration"
+# Test scaffolding by design reads local fixture tokens and writes ephemeral
+# connection files for loopback servers; scanning it produces recurring
+# file-to-HTTP false positives. Production code is analyzed in full.
+paths-ignore:
+  - test
