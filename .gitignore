@@ -19,3 +19,7 @@ coverage/
 # Assistant connection files contain bearer credentials.
 counsel-connection*.json
 *.connection.private.json
+
+# Downloaded legal datasets and generated evaluation outputs.
+evaluation/data/
+evaluation/results/

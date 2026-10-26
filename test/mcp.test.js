@@ -16,7 +16,7 @@ test("MCP connects over stdio; scoped evidence and host-written drafts require n
   const { Client } = await import("@modelcontextprotocol/client");
   const { StdioClientTransport } =
     await import("@modelcontextprotocol/client/stdio");
-  let client;
+  let client, httpClient;
   let cookie = "",
     csrf = "";
   async function api(p, b, method = b ? "POST" : "GET") {
@@ -436,7 +436,88 @@ test("MCP connects over stdio; scoped evidence and host-written drafts require n
       body: "{}",
     });
     assert.equal(blocked.status, 403);
+    const { StreamableHTTPClientTransport } =
+      await import("@modelcontextprotocol/client");
+    httpClient = new Client({ name: "counsel-http-test", version: "1.0.0" });
+    await httpClient.connect(
+      new StreamableHTTPClientTransport(new URL(origin + "/agent/v1/mcp"), {
+        requestInit: { headers: { Authorization: "Bearer " + writeKey.token } },
+      }),
+    );
+    assert.equal((await httpClient.listTools()).tools.length, 15);
+    const readHttp = new Client({
+      name: "counsel-read-http-test",
+      version: "1.0.0",
+    });
+    try {
+      await readHttp.connect(
+        new StreamableHTTPClientTransport(new URL(origin + "/agent/v1/mcp"), {
+          requestInit: {
+            headers: { Authorization: "Bearer " + readKey.token },
+          },
+        }),
+      );
+      const denied = await readHttp.callTool({
+        name: "counsel_create_task",
+        arguments: {
+          matterId: mid,
+          requestId: randomUUID(),
+          title: "Must not be created",
+        },
+      });
+      assert.equal(denied.isError, true);
+      assert.match(denied.content[0].text, /read-only/);
+    } finally {
+      await readHttp.close();
+    }
+    const noKey = await fetch(origin + "/agent/v1/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(noKey.status, 401);
+    const crossOriginHttp = await fetch(origin + "/agent/v1/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + writeKey.token,
+        Origin: "https://untrusted.example",
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    assert.equal(crossOriginHttp.status, 403);
+
+    const httpMatters = await httpClient.callTool({
+      name: "counsel_list_matters",
+      arguments: {},
+    });
+    assert.ok(!JSON.stringify(httpMatters).includes(hidden.id));
+    const httpForbidden = await httpClient.callTool({
+      name: "counsel_list_documents",
+      arguments: { matterId: hidden.id },
+    });
+    assert.equal(httpForbidden.isError, true);
+    const httpWrite = {
+      matterId: mid,
+      requestId: randomUUID(),
+      title: "HTTP retry task",
+    };
+    const firstHttpWrite = await httpClient.callTool({
+      name: "counsel_create_task",
+      arguments: httpWrite,
+    });
+    const secondHttpWrite = await httpClient.callTool({
+      name: "counsel_create_task",
+      arguments: httpWrite,
+    });
+    assert.deepEqual(
+      firstHttpWrite.structuredContent,
+      secondHttpWrite.structuredContent,
+    );
     await api("agent-tokens/" + writeKey.id, undefined, "DELETE");
+    await assert.rejects(() =>
+      httpClient.callTool({ name: "counsel_session", arguments: {} }),
+    );
     const revoked = await client.callTool({
       name: "counsel_session",
       arguments: {},
@@ -446,6 +527,7 @@ test("MCP connects over stdio; scoped evidence and host-written drafts require n
     db.prepare("UPDATE agent_tokens SET expires=0 WHERE id=?").run(readKey.id);
     assert.equal((await direct(readKey.token, "session", {})).status, 401);
   } finally {
+    await httpClient?.close();
     await client?.close();
     await workflows.close();
     await jobs.close();

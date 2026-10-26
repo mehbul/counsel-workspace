@@ -4,14 +4,14 @@ Counsel requires no Legora account or subscription and no mandatory paid model A
 
 ## Choose a reasoning mode
 
-| Mode | Where reasoning runs | Additional model API required by Counsel? |
-|---|---|---|
-| Evidence only (default) | A person reads retrieved source passages | No |
-| Assistant through MCP | Your existing Codex, Claude Code or compatible MCP host | No; usage still counts toward the host's plan and limits |
-| Local Ollama model | A model you install and serve on your computer | No paid model API for locally executed inference; hardware is required |
-| Optional API endpoint | A provider you explicitly configure | Provider billing and quotas may apply |
+| Mode                    | Where reasoning runs                                    | Additional model API required by Counsel?                              |
+| ----------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Evidence only (default) | A person reads retrieved source passages                | No                                                                     |
+| Assistant through MCP   | Your existing Codex, Claude Code or compatible MCP host | No; usage still counts toward the host's plan and limits               |
+| Local Ollama model      | A model you install and serve on your computer          | No paid model API for locally executed inference; hardware is required |
+| Optional API endpoint   | A provider you explicitly configure                     | Provider billing and quotas may apply                                  |
 
-An ordinary chatbot web page is not automatically an MCP host. This repo supplies a local **stdio** server, not a public OAuth/remote-MCP service. For DeepSeek, use an MCP-capable host with your chosen model, or a locally served model/compatible endpoint. The official DeepSeek API is a separate, potentially billable service.
+An ordinary chatbot web page is not automatically an MCP host. This repo supplies a local **stdio** adapter and an authenticated **Streamable HTTP** endpoint. OAuth registration and OAuth-only chatbot connections are not supported. For DeepSeek, use an MCP-capable host with your chosen model, or a locally served model/compatible endpoint. The official DeepSeek API is a separate, potentially billable service.
 
 ## Start the workspace
 
@@ -25,7 +25,8 @@ With Node 24.15 or newer, run `npm ci` then `npm start`. Open http://127.0.0.1:3
 2. Open **Account → Connect Codex / Claude**.
 3. Create a named key. Choose its matter scope, expiry and read-only or write mode. Read-only is the default. Write access adds imports and creation of unreviewed work; it cannot administer accounts, grant access, approve workflows or send messages.
 4. Download `counsel-connection.json` to a private location outside the repo. It contains a bearer credential, not a model-provider credential. Keep it out of shared folders and Git.
-5. Configure the adapter in your assistant using absolute paths. The workspace must be running when tools are called.
+5. Use the setup wizard to choose Codex, Claude Code or a desktop JSON client and download its settings. For local stdio, enter absolute adapter and private connection-file paths. Settings are downloaded for you to merge; existing client configurations are never overwritten. The workspace must be running when tools are called.
+6. Use **Test key and workspace** to check current permissions, then run `counsel_session` in the assistant to verify its own client connection. The browser check cannot establish that a native client was configured correctly.
 
 ### Codex
 
@@ -46,6 +47,28 @@ claude mcp add --transport stdio counsel -- node /absolute/path/to/counsel-works
 ```
 
 Quote paths containing spaces. Check with `claude mcp get counsel` or `/mcp`. Generic desktop-client JSON and Codex TOML examples are in `mcp/examples/`. Their configuration locations depend on the host. Launch `node` directly: unsilenced `npm run` banners can corrupt stdout, which carries the MCP protocol.
+
+### Direct HTTP and diagnostics
+
+The endpoint is `https://your-workspace.example/agent/v1/mcp` (loopback HTTP is usable locally). A compatible client must send `Authorization: Bearer <your-assistant-key>` on **every** request. It uses the installed MCP SDK's stateless Streamable HTTP transport with JSON responses. Authentication is checked before protocol discovery and again before each tool operation. Scope, expiry, member access, revocation and write request IDs use the same enforcement as stdio. There is no OAuth discovery or dynamic registration. Configure TLS and an explicit `APP_ORIGIN` for remote hosting; do not expose credentials over remote plaintext HTTP.
+
+Codex HTTP configuration:
+
+```toml
+[mcp_servers.counsel]
+url = "https://your-workspace.example/agent/v1/mcp"
+bearer_token_env_var = "COUNSEL_ASSISTANT_TOKEN"
+```
+
+Set that environment variable privately before launching Codex. For Claude Code choose the wizard's HTTP JSON settings and merge the `counsel` entry into `.mcp.json` only if it is private and excluded from version control. A generic JSON download does not guarantee a desktop client supports HTTP or custom headers; use stdio if its client does not.
+
+For a key check without any model usage:
+
+```sh
+node mcp/diagnose.mjs --connection-file /private/path/counsel-connection.json
+```
+
+It reports connectivity, access mode, matter count and expiry without displaying credentials or documents. A failure with a valid URL usually means Counsel is stopped or the key expired/revoked. If the diagnostic passes but the assistant cannot connect, check its absolute paths, Node availability, client transport support and environment, then reconnect the client. `mcp/start.cmd --connection-file ...` on Windows or `sh mcp/start.sh --connection-file ...` on POSIX launches the stdio adapter from any current directory. Node 24.15+ must be on PATH; no settings are installed automatically.
 
 ### Try an actual workflow
 
@@ -95,7 +118,7 @@ Tool results enter the connected assistant's context under its provider's data p
 
 ## Verification and limits
 
-`npm test` launches the adapter with a real MCP SDK client over stdio and checks discovery, scoped reads, outputs, citations, idempotency, revocation, expiry, current member access, pagination and unsafe URLs. Model adapters also have synthetic-response tests.
+`npm test` launches real MCP SDK clients over stdio and Streamable HTTP and checks discovery, scoped reads, outputs, citations, idempotency, revocation, expiry, current member access, pagination and unsafe URLs. Model adapters also have synthetic-response tests.
 
 On 25 October 2026, a live **Codex CLI 0.164.0-alpha.11.1** run using existing ChatGPT sign-in passed the full MCP path: list matters/documents, read the synthetic NDA, save a host-authored review, and save a cited memorandum. The server remained in evidence-only mode and made no separate model API call. The fixture verified persisted artifacts and tool-call traces, then revoked its key and removed its temporary data. Saved Codex configuration was not changed. Repeat this optional test with `node scripts/smoke-codex.js`; it consumes the signed-in Codex account's normal usage allowance.
 

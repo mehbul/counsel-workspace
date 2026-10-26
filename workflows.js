@@ -2,6 +2,17 @@ const { randomUUID } = require("node:crypto");
 const { z } = require("zod");
 const { context } = require("./security");
 const text = (n) => z.string().trim().min(1).max(n);
+const approvalPolicy = z
+  .object({
+    independent: z.boolean().default(false),
+    requiredApprovals: z.number().int().min(1).max(2).default(1),
+  })
+  .strict();
+const policyFor = (step) => ({
+  independent: false,
+  requiredApprovals: 1,
+  ...step.approvalPolicy,
+});
 const step = z
   .object({
     kind: z.enum(["search", "review", "draft", "task", "approval"]),
@@ -9,11 +20,23 @@ const step = z
     prompt: z.string().max(20000).optional(),
     columns: z.array(text(500)).min(1).max(12).optional(),
     skillId: z.string().uuid().optional(),
+    approvalPolicy: approvalPolicy.optional(),
+    condition: z
+      .object({
+        step: z.number().int().min(0).max(11),
+        operator: z.enum(["has_evidence", "no_evidence"]),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .refine(
     (s) => s.kind !== "review" || s.columns?.length,
     "Review steps need columns",
+  )
+  .refine(
+    (s) => s.kind === "approval" || !s.approvalPolicy,
+    "Approval policies belong only to approval steps",
   );
 const definition = z
   .object({
@@ -22,6 +45,24 @@ const definition = z
     steps: z.array(step).min(1).max(12),
   })
   .strict();
+function validateConditions(d) {
+  for (const [index, step] of d.steps.entries()) {
+    if (!step.condition) continue;
+    const source = d.steps[step.condition.step];
+    if (
+      step.kind === "approval" ||
+      step.condition.step >= index ||
+      !["search", "review"].includes(source?.kind)
+    )
+      throw Object.assign(
+        Error(
+          "Conditions must refer to an earlier search or review step; approval steps cannot be conditional.",
+        ),
+        { status: 400 },
+      );
+  }
+  return d;
+}
 const now = () => new Date().toISOString();
 const error = (status, message) => Object.assign(Error(message), { status });
 function installWorkflows(app, db, security, save, tools) {
@@ -56,13 +97,88 @@ function installWorkflows(app, db, security, save, tools) {
     if (!r || !canMatter(r.matter_id)) throw error(404, "Run not found.");
     const run = JSON.parse(r.data);
     run.status = r.status;
+    run.initiatorId ||= r.actor;
+    return describeApprovals(run);
+  }
+  function eligibleApprovers(matterId) {
+    // Context is request-local and workspace writes are serialized. Do not retain
+    // this cache across requests: revocation must affect the next operation.
+    const cache = (c().workflowApprovers ||= new Map());
+    if (!cache.has(matterId))
+      cache.set(
+        matterId,
+        new Map(
+          db
+            .prepare(
+              "SELECT id,email FROM users WHERE workspace_id=? AND disabled=0 AND role IN ('owner','editor') AND (role='owner' OR id IN (SELECT user_id FROM matter_access WHERE workspace_id=? AND matter_id=?))",
+            )
+            .all(c().workspaceId, c().workspaceId, matterId)
+            .map((u) => [u.id, u]),
+        ),
+      );
+    return cache.get(matterId);
+  }
+  function approvalState(run, index) {
+    const policy = policyFor(run.steps[index]),
+      eligible = eligibleApprovers(run.matterId),
+      counted = new Set(),
+      decisions = run.outputs
+        .filter((o) => o.kind === "approval" && o.step === index)
+        .map((o) => {
+          // Old completed runs recorded email only. Match them to the current
+          // member for backwards-compatible replay without treating an email as
+          // the identity for any new decision.
+          const actorId =
+            o.actorId ||
+            [...eligible.values()].find((u) => u.email === o.actor)?.id;
+          const valid =
+            !!actorId &&
+            eligible.has(actorId) &&
+            !(policy.independent && actorId === run.initiatorId);
+          if (valid && o.decision === "approve") counted.add(actorId);
+          return { ...o, actorId, valid };
+        });
+    return {
+      step: index,
+      ...policy,
+      validApprovals: counted.size,
+      pendingApprovals: Math.max(0, policy.requiredApprovals - counted.size),
+      canApprove:
+        eligible.has(c().actor) &&
+        !(policy.independent && c().actor === run.initiatorId) &&
+        !counted.has(c().actor),
+      decisions,
+    };
+  }
+  function describeApprovals(run) {
+    run.approvalStates = run.steps.flatMap((step, index) =>
+      step.kind === "approval" ? [approvalState(run, index)] : [],
+    );
+    run.approvalState =
+      run.approvalStates.find((a) => a.step === run.stepIndex) || null;
     return run;
+  }
+  function assertCompletedApprovals(run) {
+    const invalid = run.approvalStates.find(
+      (approval) =>
+        approval.step < run.stepIndex &&
+        approval.validApprovals < approval.requiredApprovals,
+    );
+    if (invalid)
+      throw Object.assign(
+        error(
+          409,
+          "An earlier approval no longer meets its policy because reviewer access changed. Restore the required access before retrying, or cancel and start a new run for fresh approvals.",
+        ),
+        { code: "APPROVAL_ACCESS_CHANGED" },
+      );
   }
   function putRun(run) {
     run.updated = now();
+    const { approvalState, approvalStates, ...saved } = run;
     db.prepare(
       "UPDATE workflow_runs SET data=?,status=? WHERE id=? AND workspace_id=?",
-    ).run(JSON.stringify(run), run.status, run.id, c().workspaceId);
+    ).run(JSON.stringify(saved), run.status, run.id, c().workspaceId);
   }
   function templates() {
     return db
@@ -148,13 +264,19 @@ function installWorkflows(app, db, security, save, tools) {
       )
       .all(c().workspaceId)
       .filter((r) => canMatter(r.matter_id))
-      .map((r) => ({ ...JSON.parse(r.data), status: r.status }));
+      .map((r) =>
+        describeApprovals({
+          ...JSON.parse(r.data),
+          initiatorId: r.actor,
+          status: r.status,
+        }),
+      );
     res.json({ templates: templates(), runs });
   });
   app.post(
     "/api/workflows",
     wrap(async (req, res) => {
-      const d = definition.parse(req.body),
+      const d = validateConditions(definition.parse(req.body)),
         id = randomUUID();
       db.prepare("INSERT INTO workflow_templates VALUES(?,?,?,?,?)").run(
         id,
@@ -179,6 +301,7 @@ function installWorkflows(app, db, security, save, tools) {
       if (r.version !== b.version)
         throw error(409, "Workflow changed. Reload before editing.");
       const { version, ...d } = b;
+      validateConditions(d);
       db.prepare(
         "UPDATE workflow_templates SET definition=?,version=version+1,updated=? WHERE id=? AND workspace_id=?",
       ).run(JSON.stringify(d), now(), r.id, c().workspaceId);
@@ -200,7 +323,7 @@ function installWorkflows(app, db, security, save, tools) {
         429,
         "Finish or cancel an existing workflow before starting another.",
       );
-    const d = JSON.parse(r.definition);
+    const d = validateConditions(JSON.parse(r.definition));
     const ids =
       b.documentIds !== undefined
         ? b.documentIds
@@ -223,6 +346,7 @@ function installWorkflows(app, db, security, save, tools) {
       if (s.skillId && !skill) throw error(404, "Skill not found.");
       return {
         ...s,
+        ...(s.kind === "approval" ? { approvalPolicy: policyFor(s) } : {}),
         artifactId: randomUUID(),
         instructions: skill?.instructions || "",
         skillVersion: skill?.version || 1,
@@ -234,6 +358,10 @@ function installWorkflows(app, db, security, save, tools) {
       templateId: r.id,
       templateVersion: r.version,
       name: d.name,
+      initiatorId: c().actor,
+      initiatorEmail: db
+        .prepare("SELECT email FROM users WHERE id=?")
+        .get(c().actor).email,
       steps,
       documentIds: [...new Set(ids)],
       input: b.input || "",
@@ -256,7 +384,7 @@ function installWorkflows(app, db, security, save, tools) {
       run.created,
     );
     audit("workflow.run.started", run.id);
-    return run;
+    return describeApprovals(run);
   }
   const startSchema = z
     .object({
@@ -287,6 +415,8 @@ function installWorkflows(app, db, security, save, tools) {
           .strict()
           .parse(req.body),
         run = getRun(req.params.id);
+      if (!["owner", "editor"].includes(req.user.role))
+        throw error(403, "Only editors and owners can decide workflow runs.");
       if (run.revision !== b.revision)
         throw error(409, "Run changed. Reload its latest status.");
       if (b.action === "retry") {
@@ -301,30 +431,62 @@ function installWorkflows(app, db, security, save, tools) {
       } else {
         if (run.status !== "waiting_approval")
           throw error(409, "Run is not awaiting approval.");
+        if (
+          !eligibleApprovers(run.matterId).has(req.user.id) ||
+          (run.approvalState.independent && run.initiatorId === req.user.id)
+        )
+          throw error(
+            403,
+            "This step requires an independent reviewer with current matter access.",
+          );
+        if (
+          run.outputs.some(
+            (o) =>
+              o.kind === "approval" &&
+              o.step === run.stepIndex &&
+              o.actorId === req.user.id,
+          )
+        )
+          throw error(
+            409,
+            "This account has already decided this approval step.",
+          );
         run.outputs.push({
           kind: "approval",
           step: run.stepIndex,
           decision: b.action,
           note: b.note,
           actor: req.user.email,
+          actorId: req.user.id,
           created: now(),
         });
         if (b.action === "reject") run.status = "cancelled";
         else {
-          run.stepIndex++;
-          run.status =
-            run.stepIndex === run.steps.length ? "completed" : "queued";
+          const approval = approvalState(run, run.stepIndex);
+          if (approval.validApprovals >= approval.requiredApprovals) {
+            run.stepIndex++;
+            run.status =
+              run.stepIndex === run.steps.length ? "completed" : "queued";
+          }
         }
       }
       run.revision++;
       putRun(run);
       audit("workflow.run." + b.action, run.id);
-      res.json(run);
+      res.json(describeApprovals(run));
     }),
+  );
+  const schedules = require("./workflow-schedules").installWorkflowSchedules(
+    app,
+    db,
+    security,
+    { start, startSchema, wrap, canMatter, row },
   );
   let working = false,
     closed = false;
   async function tick() {
+    if (working || closed) return;
+    await schedules.tick();
     if (working || closed) return;
     const record = db
       .prepare(
@@ -340,6 +502,7 @@ function installWorkflows(app, db, security, save, tools) {
         async () => {
           const run = getRun(record.id);
           if (!["queued", "running"].includes(run.status)) return;
+          assertCompletedApprovals(run);
           const step = run.steps[run.stepIndex];
           if (!step) {
             run.status = "completed";
@@ -359,9 +522,43 @@ function installWorkflows(app, db, security, save, tools) {
             putRun(run);
             return;
           }
+          if (step.condition) {
+            const source = run.outputs.find(
+              (o) => o.step === step.condition.step && o.kind !== "approval",
+            );
+            const known =
+              Number.isInteger(source?.evidenceCount) && !source.skipped;
+            const matches =
+              known &&
+              (step.condition.operator === "has_evidence"
+                ? source.evidenceCount > 0
+                : source.evidenceCount === 0);
+            if (!matches) {
+              run.outputs.push({
+                kind: step.kind,
+                step: run.stepIndex,
+                name: step.name,
+                skipped: true,
+                condition: step.condition,
+                reason: known
+                  ? `Condition ${step.condition.operator} on step ${step.condition.step + 1} was false (${source.evidenceCount} recorded citations).`
+                  : "Referenced evidence step was skipped or has no recorded evidence count; branch cannot be evaluated.",
+                created: now(),
+              });
+              run.stepIndex++;
+              run.revision++;
+              run.status =
+                run.stepIndex === run.steps.length ? "completed" : "queued";
+              putRun(run);
+              audit("workflow.step.skipped", run.id);
+              return;
+            }
+          }
           run.status = "running";
           putRun(run);
-          const prev = run.outputs.filter((o) => o.kind !== "approval").at(-1);
+          const prev = run.outputs
+            .filter((o) => o.kind !== "approval" && !o.skipped)
+            .at(-1);
           let previous = "";
           if (prev) {
             if (prev.kind === "review") {
@@ -438,6 +635,17 @@ function installWorkflows(app, db, security, save, tools) {
             kind: step.kind,
             step: run.stepIndex,
             artifactId: artifact.id,
+            ...(["search", "review"].includes(step.kind)
+              ? {
+                  evidenceCount:
+                    step.kind === "review"
+                      ? (artifact.cells || []).reduce(
+                          (n, cell) => n + (cell.citations?.length || 0),
+                          0,
+                        )
+                      : artifact.citations?.length || 0,
+                }
+              : {}),
             name: step.name,
             created: now(),
           });
@@ -449,14 +657,16 @@ function installWorkflows(app, db, security, save, tools) {
           audit("workflow.step.completed", run.id);
         },
       );
-    } catch {
+    } catch (failure) {
       const latest = db
         .prepare("SELECT data FROM workflow_runs WHERE id=?")
         .get(record.id);
       const run = JSON.parse(latest.data);
       run.status = "failed";
       run.error =
-        "Step failed. Check source access and provider settings. Retry preserves completed outputs.";
+        failure.code === "APPROVAL_ACCESS_CHANGED"
+          ? failure.message
+          : "Step failed. Check source access and provider settings. Retry preserves completed outputs.";
       run.revision++;
       run.updated = now();
       db.prepare("UPDATE workflow_runs SET data=?,status=? WHERE id=?").run(
@@ -771,9 +981,37 @@ function installWorkflows(app, db, security, save, tools) {
   );
   return {
     tick,
+    schedules,
+    list: () => ({
+      templates: templates(),
+      runs: db
+        .prepare(
+          "SELECT id FROM workflow_runs WHERE workspace_id=? ORDER BY created DESC LIMIT 200",
+        )
+        .all(c().workspaceId)
+        .flatMap((r) => {
+          const raw = row("workflow_runs", r.id);
+          return canMatter(raw.matter_id) ? [getRun(r.id)] : [];
+        }),
+    }),
+    getRun,
+    start: (templateId, input) => start(templateId, startSchema.parse(input)),
+    cancel: (id, revision) => {
+      const run = getRun(id);
+      if (run.revision !== revision)
+        throw error(409, "Run changed. Reload its latest status.");
+      if (["completed", "cancelled"].includes(run.status))
+        throw error(409, "Run has already ended.");
+      run.status = "cancelled";
+      run.revision++;
+      putRun(run);
+      audit("workflow.run.cancel", id);
+      return describeApprovals(run);
+    },
     close: async () => {
       closed = true;
       clearInterval(timer);
+      await schedules.close();
       while (working) await new Promise((r) => setTimeout(r, 30));
     },
   };

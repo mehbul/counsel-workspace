@@ -14,8 +14,11 @@ function createCollaboration(db, security, save) {
     perMessageDeflate: false,
   });
   function authorized(req, draftId) {
+    if (security.personal && !security.personal.validateRequest(req))
+      return null;
     const user = security.session(req);
-    if (!user) return null;
+    if (!user || !["owner", "editor", "viewer"].includes(user.role))
+      return null;
     const row = db
       .prepare("SELECT value FROM workspaces WHERE id=?")
       .get(user.workspace_id);
@@ -206,6 +209,8 @@ function createCollaboration(db, security, save) {
   });
   function attach(server) {
     server.on("upgrade", (req, socket, head) => {
+      if (security.personal && !security.personal.validateRequest(req))
+        return socket.destroy();
       let url;
       try {
         url = new URL(req.url, "http://localhost");

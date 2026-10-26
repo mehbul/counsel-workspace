@@ -1,0 +1,13 @@
+# Document fidelity
+
+New uploads can retain their exact original bytes in the SQLite `document_originals` table. Include the database in existing backup/restore procedures. Originals are immutable per document ID; importing a new source version requires a new document ID. Existing text-only records do not acquire originals retroactively.
+
+Original download rechecks the current workspace, document, and accessible matter before returning bytes. Removed documents and revoked matter access return 404 even if their original remains in the database. The attachment is served as an opaque download with `nosniff` and no caching. SQLite files and backups contain sensitive original data and rely on the host's disk controls.
+
+`parseDocument(buffer, ext)` still resolves to a string. `parseDocumentDetailed` also returns PDF page anchors as 1-based physical page numbers and half-open JavaScript character offsets into the exact extracted text. These anchors describe extracted text, not visual coordinates. Extraction does not reconstruct reading order perfectly for every PDF. No OCR engine is configured; status explicitly reports unavailable/disabled and flags PDFs with no extracted text. No OCR or paid service is invoked.
+
+Full comparison covers all text up to the existing 2 million character document limit and never silently truncates. It computes word/whitespace changes after trimming common boundaries. If the remaining edit matrix would exceed 2 million cells, it reports `coarse: true` and treats that whole region as a replacement. This preserves complete text coverage but can be less granular. It compares text, not legal meaning.
+
+The Word export is a newly reconstructed DOCX containing genuine `w:ins` and `w:del` revisions. Word can accept or reject these changes. It does **not** preserve original DOCX layout, styles, tables, fields, comments, images, signatures, or original revisions. Original files remain separately downloadable. PDF text and DOCX extraction can change formatting and reading order; compare originals before relying on a result.
+
+Integration: create `createDocumentFiles(db)` after security setup, call its `install(app)`, and call `retain(document.id, upload.buffer, upload.mimetype)` after adding the authorized document to request context. Install `installRedlines(app)` behind the existing authentication/CSRF middleware. Upload handlers can persist `pages` and `ocr` from `parseDocumentDetailed`. Load `public/document-tools.js`; `window.documentTools.compare([beforeId, afterId])` returns the full report and `downloadRedline` downloads Word revisions. The caller must display the reconstruction/coarse-diff notices.

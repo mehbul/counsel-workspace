@@ -1,0 +1,47 @@
+# Remaining product work and acceptance evidence
+
+The target is a self-hosted legal workspace usable with existing assistants, local accounts and no mandatory Legora or model API subscription. Keep this repository private. Public documentation defines advertised workflows; authenticated Legora behavior and comparative legal quality remain unavailable. The owner confirmed on 25 October 2026 that only public documentation and local tests are available.
+
+Implementation uses the existing Express/SQLite authorization boundary, immutable source snapshots and MCP host reasoning. Each feature must have working behavior and meaningful access-control or correctness tests. A UI, stub adapter, synthetic score or configurable endpoint does not establish an enterprise integration or accuracy result.
+
+## Current implementation work
+
+- [x] Client portal: separate guest role and page; explicit document and reviewed-text publication; selected recipients and matter grants; immediate revocation; internal API, WebSocket and MCP denial. Test unpublished-source isolation, cross-matter/workspace access, source removal and disabled guests. Files: portal.js, public/portal.*, security.js, public/auth.js, test/portal.test.js.
+- [x] Workflow approvals: independently configurable approvers and quorum; signed decision history; immutable policies; current grants checked for each vote and before later side effects. Test self/duplicate/stale approvals, revocation and retry. Files: workflows.js, public/workflows.js, test/workflow-policies.test.js.
+- [x] Legal evaluation: import a pinned, licensed external annotated dataset; split by document; separate prompts and labels; validate provenance, missing predictions and leakage; score span extraction, abstention and exact citations. Run a published retrieval baseline and optional existing-Codex evaluation. Files: evaluation/, scripts/*legal*, scripts/import-cuad.js, test/legal-evaluation.test.js. Results and limits are recorded in LEGAL-EVALUATION.md; the validation split scored 33.98% answerable-only token F1 and 77.05% answerability balanced accuracy.
+- [x] External source research and publication monitoring: use the public Federal Register API with explicit user queries, bounded requests and links to official editions; preserve provenance and publication/effective-date fields. Persist explicit matter-scoped watches, deduplicated alerts and scan failures. Test network failures, upstream URL validation, current permissions and revocation. This source alone does not provide global research or authoritative current-law verification.
+- [ ] Integrate, review, test through the Codex browser, run actual Codex acceptance where relevant, scan staged content, push privately and verify Docker CI. Locally, the full regression suite, synthetic benchmark, format checks and production build pass. Browser acceptance, staged-content scanning and Docker CI remain to be completed; the branch is ready for private push.
+
+## Seven-priority verification (26 October 2026)
+
+`npm test` passes 185/185 after the clause-engine change; `npm run benchmark` reports 100% hit@3 and 0 false positives on the synthetic suite; `npm run build` succeeds; targeted Prettier checks pass.
+
+| Priority | Locally verified | External or residual gap |
+|---|---|---|
+| Assistant onboarding | MCP stdio/HTTP discovery, scoped reads, connection-file validation and revocation are covered by test/mcp.test.js and test/security-regressions.test.js. A live Codex CLI MCP acceptance run is recorded in ASSISTANTS.md. | Real Claude/desktop client registration and every host's setup flow remain unverified. |
+| Legal accuracy | Deterministic clause anchors, metadata extraction, exact offsets and abstention are covered by test/clause-review.test.js and the document-disjoint CUAD split. Development answerable-only token F1 is 58.55% with 100% answerability balanced accuracy; validation is 33.98% with 77.05% balanced accuracy. See LEGAL-EVALUATION.md. | Only five contracts; the validation partition has now been inspected and is no longer fresh; no legal-advice or Legora-quality claim. |
+| Word redlines | DOCX revision export, tracked insertion, comparison truncation and exact excerpt reconstruction are covered by test/redlines.test.js, test/office.test.js and test/comparisons.test.js. | In-place Word/Outlook add-ins and tenant acceptance remain open. |
+| Research | Federal Register/eCFR imports, official-origin pinning, bounded requests, matter-scoped watches, deduplication and revocation are covered by test/research.test.js, test/ecfr-source.test.js and test/legal-sources.test.js. | Licensed commentary, broad multi-jurisdiction coverage and subsequent-treatment validation remain open. |
+| Workflows | Approval quorum, frozen inputs, idempotent resume, conditional branches, durable schedules and permission revocation are covered by test/workflows.test.js, test/workflow-policies.test.js and test/workflow-schedules.test.js. | Bounded external actions, guest execution and delivery receipts remain open. |
+| Model choice | Evidence-only default, native Anthropic, Ollama, OpenAI-compatible and OpenAI adapters, endpoint validation and encrypted settings are covered by test/models.test.js and test/model-settings.test.js. | A specific DeepSeek model and live provider-account acceptance remain unverified. |
+| Operational readiness | Authentication/CSRF/ACL, backup/WAL, personal-mode guards, malformed-message handling and security regressions are covered by the full suite. Build and format checks pass. | Live TLS/load testing, multi-instance design, external security assessment, Docker CI and a deployment restore drill remain open. |
+
+These are local behavioral results, not an enterprise or comparative certification.
+
+## Further implementation tracks
+
+These remain open until their acceptance evidence is recorded:
+
+| Track | Locally verified | Remaining acceptance evidence |
+|---|---|---|
+| Broader legal research | Federal Register and eCFR clients with official-origin pinning/bounded reads; matter-scoped publication watches and revocation tests. | Licensed commentary, jurisdiction/date breadth beyond configured public feeds, subsequent-treatment validation and independent legal review. |
+| Office add-ins | DOCX import/export, tracked insertions, revision XML in export, and Office bridge manifest/bearer-scope tests. | Installable tenant-tested Word/Outlook task panes, real document/mail APIs, tenant or desktop acceptance, and tracked-change interoperability. |
+| DMS integrations | Google Drive pagination/recursion and Microsoft Graph continuation tests; encrypted connector credentials; idempotent imports and explicit new-DOCX writeback. | iManage/NetDocuments adapters, provider ACL/ethical-wall mapping, deletion/revocation propagation, version writeback and authorized tenant tests. |
+| Retrieval and document fidelity | Clause engine measured on a document-disjoint CUAD split; semantic candidates and coverage tests; exact page anchors; OCR-needed reporting; full-document comparison. | Independent dataset results, real OCR, layout-preserving originals and broader semantic measurements. |
+| Advanced workflows | Conditional branches, approval gates, durable schedules and restart coalescing tested. | Bounded external actions, guest workflow execution and notification delivery receipts. |
+| Enterprise operations | Backup/WAL, authentication/ACL/CSRF, personal-mode guards, security regressions, build and format checks. | Deployment HTTPS and restore drill, realistic concurrency/load measurements, multi-instance design, independent security assessment, SSO/SCIM if required, and any external certification. |
+| Comparative quality | No authorized Legora access or exports. | Identical authorized inputs in both products, frozen versions/configuration, blinded legal grading, error severity and abstention, confidence intervals and predeclared success criteria. |
+
+## Verification and completion rules
+
+`npm test`, format checks, dependency audit and Docker CI must pass for each integrated release. A test suite proves its exercised behaviors. Public benchmark reuse can involve training contamination; a document-level split prevents local overlap but cannot establish that a model never saw the source. Neither extraction F1 nor exact quote checks establish legal reasoning accuracy. The completion ledger must distinguish implemented, locally tested, live verified and externally unverified work.

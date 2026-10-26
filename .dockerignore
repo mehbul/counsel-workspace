@@ -10,3 +10,7 @@ workspace-preview.png
 # Assistant connection files contain bearer credentials.
 counsel-connection*.json
 *.connection.private.json
+
+evaluation/data/
+evaluation/results/
+test-output/

@@ -9,22 +9,28 @@ let workflowCache = {
   workflowBuilder;
 const runStatus = (s) =>
   `<span class="run-status ${esc(s)}">${esc(s.replaceAll("_", " "))}</span>`;
-const editable = () => authState?.user?.role !== "viewer";
+const approvalPolicyLabel = (s) => {
+  if (s.kind !== "approval") return "";
+  const policy = s.approvalPolicy || {};
+  return `${policy.independent ? "Independent review · " : ""}${policy.requiredApprovals || 1} approval${policy.requiredApprovals === 2 ? "s" : ""}`;
+};
+const editable = () => ["owner", "editor"].includes(authState?.user?.role);
 async function loadWorkflowViews() {
   clearTimeout(workflowPoll);
   const current = view,
     currentMatter = matterId;
   try {
-    const [a, b] = await Promise.all([
+    const [a, b, schedules] = await Promise.all([
       api("workflows", undefined, "GET"),
       api("operations", undefined, "GET"),
+      api("workflow-schedules", undefined, "GET"),
     ]);
     if (view !== current || matterId !== currentMatter) return;
-    workflowCache = { ...a, ...b };
+    workflowCache = { ...a, ...b, schedules };
     const el = $("#workflow-content");
     if (!el) return;
     if (view === "workflows")
-      el.innerHTML = `<div class="sectiontitle"><h2>Workflow library</h2><span class="muted">Saved steps · reviewed outputs</span></div><div class="workflow-grid">${a.templates.map((t) => `<article class="workflow-card"><span class="pill">Version ${t.version}</span><h2>${esc(t.name)}</h2><p>${esc(t.description)}</p><ol class="step-preview">${t.steps.map((s) => `<li>${esc(s.name)} <small>${esc(s.kind)}</small></li>`).join("")}</ol><footer><button class="textbutton" onclick="editWorkflow('${t.id}')">${editable() ? "Edit template" : "View template"}</button>${editable() ? `<button class="primary" onclick="startWorkflow('${t.id}')">Start workflow ↗</button>` : ""}</footer></article>`).join("")}</div><div class="sectiontitle"><h2>Run history</h2><span class="muted">Current matter</span></div><div class="recentlist">${
+      el.innerHTML = `<div class="sectiontitle"><h2>Workflow library</h2><span class="muted">Saved steps · reviewed outputs</span></div><div class="workflow-grid">${a.templates.map((t) => `<article class="workflow-card"><span class="pill">Version ${t.version}</span><h2>${esc(t.name)}</h2><p>${esc(t.description)}</p><ol class="step-preview">${t.steps.map((s) => `<li>${esc(s.name)} <small>${esc(s.kind === "approval" ? approvalPolicyLabel(s) : s.kind)}</small></li>`).join("")}</ol><footer><button class="textbutton" onclick="editWorkflow('${t.id}')">${editable() ? "Edit template" : "View template"}</button>${editable() ? `<button class="primary" onclick="startWorkflow('${t.id}')">Start workflow ↗</button>` : ""}</footer></article>`).join("")}</div><div class="sectiontitle"><h2>Run history</h2><span class="muted">Current matter</span></div><div class="recentlist">${
         a.runs
           .filter((r) => r.matterId === matterId)
           .map(
@@ -32,7 +38,7 @@ async function loadWorkflowViews() {
               `<button class="run-row" onclick="inspectWorkflowRun('${r.id}')"><div><strong>${esc(r.name)}</strong><small>Template v${r.templateVersion} · ${r.stepIndex}/${r.steps.length} steps · ${new Date(r.created).toLocaleString()}</small></div>${runStatus(r.status)}<span>Open →</span></button>`,
           )
           .join("") || '<p class="muted">No runs for this matter yet.</p>'
-      }</div>`;
+      }</div>${workflowSchedulePanel(schedules)}`;
     if (view === "intake")
       el.innerHTML = `<div class="operations-note">Track requests, assign a lawyer, run a workflow, and record the approved resolution. Requests created here stay inside this workspace.</div><div class="recentlist">${
         b.intake
@@ -111,12 +117,46 @@ function captureWorkflowBuilder() {
     const sk = f.elements["skill-" + i];
     if (sk?.value) s.skillId = sk.value;
     else delete s.skillId;
+    const condition = f.elements["condition-" + i]?.value;
+    if (s.kind !== "approval" && condition) {
+      const [source, operator] = condition.split(":");
+      s.condition = { step: Number(source), operator };
+    } else delete s.condition;
+    if (s.kind === "approval")
+      s.approvalPolicy = {
+        independent: f.elements["independent-" + i]?.checked || false,
+        requiredApprovals: Number(f.elements["approvals-" + i]?.value || 1),
+      };
+    else delete s.approvalPolicy;
   }
 }
 function drawWorkflowBuilder() {
   modal(
     workflowBuilder.id ? "Workflow template" : "Create a workflow",
-    `<form id="workflow-builder"><div class="form-grid"><label>Name<input name="name" value="${esc(workflowBuilder.name)}" required maxlength="200"></label><label>Description<input name="description" value="${esc(workflowBuilder.description)}" maxlength="2000"></label></div><p>Build an ordered process. Approval steps pause until a lawyer approves or rejects the work. Use {{input}} for the request and {{previous}} for the preceding output.</p><div class="builder-steps">${workflowBuilder.steps.map((s, i) => `<section class="builder-step"><div class="step-heading"><strong>Step ${i + 1}</strong><button class="textbutton" type="button" onclick="moveWorkflowStep(${i},-1)" ${i === 0 ? "disabled" : ""}>Move up</button><button class="textbutton" type="button" onclick="moveWorkflowStep(${i},1)" ${i === workflowBuilder.steps.length - 1 ? "disabled" : ""}>Move down</button><button class="textbutton" type="button" onclick="removeWorkflowStep(${i})">Remove</button></div><label>Step name<input name="step-${i}" value="${esc(s.name)}" required maxlength="200"></label><label>Action<select name="kind-${i}" onchange="changeWorkflowKind(${i})">${["search", "review", "approval", "draft", "task"].map((k) => `<option value="${k}" ${k === s.kind ? "selected" : ""}>${{ search: "Find evidence", review: "Tabular review", approval: "Human approval", draft: "Create draft", task: "Create task" }[k]}</option>`).join("")}</select></label>${s.kind === "review" ? `<label>Questions — one per line<textarea name="columns-${i}" required>${esc((s.columns || ["Governing law"]).join("\n"))}</textarea></label>` : s.kind !== "approval" ? `<label>Instructions<textarea name="prompt-${i}" maxlength="20000" required>${esc(s.prompt || "{{input}}")}</textarea></label>` : ""}${["search", "draft"].includes(s.kind) ? `<label>Apply a skill<select name="skill-${i}"><option value="">No skill</option>${S.skills.map((sk) => `<option value="${sk.id}" ${sk.id === s.skillId ? "selected" : ""}>${esc(sk.name)} · v${sk.version || 1}</option>`).join("")}</select></label>` : ""}</section>`).join("")}</div>${editable() ? '<button class="secondary" type="button" onclick="addWorkflowStep()">＋ Add step</button><div class="modalfooter"><button class="primary">Save workflow</button></div>' : ""}</form>`,
+    `<form id="workflow-builder"><div class="form-grid"><label>Name<input name="name" value="${esc(workflowBuilder.name)}" required maxlength="200"></label><label>Description<input name="description" value="${esc(workflowBuilder.description)}" maxlength="2000"></label></div><p>Build an ordered process. Approval steps pause until their required reviewers approve. Independent approval excludes the person who started the run. Use {{input}} for the request and {{previous}} for the preceding output.</p><div class="builder-steps">${workflowBuilder.steps
+      .map(
+        (s, i) =>
+          `<section class="builder-step"><div class="step-heading"><strong>Step ${i + 1}</strong><button class="textbutton" type="button" onclick="moveWorkflowStep(${i},-1)" ${i === 0 ? "disabled" : ""}>Move up</button><button class="textbutton" type="button" onclick="moveWorkflowStep(${i},1)" ${i === workflowBuilder.steps.length - 1 ? "disabled" : ""}>Move down</button><button class="textbutton" type="button" onclick="removeWorkflowStep(${i})">Remove</button></div><label>Step name<input name="step-${i}" value="${esc(s.name)}" required maxlength="200"></label><label>Action<select name="kind-${i}" onchange="changeWorkflowKind(${i})">${["search", "review", "approval", "draft", "task"].map((k) => `<option value="${k}" ${k === s.kind ? "selected" : ""}>${{ search: "Find evidence", review: "Tabular review", approval: "Human approval", draft: "Create draft", task: "Create task" }[k]}</option>`).join("")}</select></label>${s.kind === "review" ? `<label>Questions — one per line<textarea name="columns-${i}" required>${esc((s.columns || ["Governing law"]).join("\n"))}</textarea></label>` : s.kind !== "approval" ? `<label>Instructions<textarea name="prompt-${i}" maxlength="20000" required>${esc(s.prompt || "{{input}}")}</textarea></label>` : `<fieldset><legend>Approval policy</legend><label><input type="checkbox" name="independent-${i}" ${s.approvalPolicy?.independent ? "checked" : ""}> Require reviewers other than the run initiator</label><label>Distinct approvals required<select name="approvals-${i}"><option value="1" ${(s.approvalPolicy?.requiredApprovals || 1) === 1 ? "selected" : ""}>One reviewer</option><option value="2" ${s.approvalPolicy?.requiredApprovals === 2 ? "selected" : ""}>Two reviewers</option></select></label><p>Reviewers must be current owners or editors with matter access. One rejection cancels the run.</p></fieldset>`}${
+            s.kind !== "approval" && i > 0
+              ? `<label>Run this step when<select name="condition-${i}"><option value="">Always</option>${workflowBuilder.steps
+                  .slice(0, i)
+                  .flatMap((previous, j) =>
+                    ["search", "review"].includes(previous.kind)
+                      ? ["has_evidence", "no_evidence"].map(
+                          (operator) =>
+                            `<option value="${j}:${operator}" ${s.condition?.step === j && s.condition?.operator === operator ? "selected" : ""}>Step ${j + 1}: ${esc(previous.name)} � ${operator === "has_evidence" ? "has recorded citations" : "has no recorded citations"}</option>`,
+                        )
+                      : [],
+                  )
+                  .join(
+                    "",
+                  )}</select></label><small>No recorded citation is a retrieval result, not proof that a clause is absent. Approval steps always run.</small>`
+              : ""
+          }${["search", "draft"].includes(s.kind) ? `<label>Apply a skill<select name="skill-${i}"><option value="">No skill</option>${S.skills.map((sk) => `<option value="${sk.id}" ${sk.id === s.skillId ? "selected" : ""}>${esc(sk.name)} · v${sk.version || 1}</option>`).join("")}</select></label>` : ""}</section>`,
+      )
+      .join(
+        "",
+      )}</div>${editable() ? '<button class="secondary" type="button" onclick="addWorkflowStep()">＋ Add step</button><div class="modalfooter"><button class="primary">Save workflow</button></div>' : ""}</form>`,
   );
   $("#workflow-builder").onsubmit = async (e) => {
     e.preventDefault();
@@ -126,8 +166,14 @@ function drawWorkflowBuilder() {
       const value = { kind: s.kind, name: s.name };
       if (s.kind === "review") value.columns = s.columns || ["Governing law"];
       else if (s.kind !== "approval") value.prompt = s.prompt || "{{input}}";
+      else
+        value.approvalPolicy = s.approvalPolicy || {
+          independent: false,
+          requiredApprovals: 1,
+        };
       if (["search", "draft"].includes(s.kind) && s.skillId)
         value.skillId = s.skillId;
+      if (s.kind !== "approval" && s.condition) value.condition = s.condition;
       return value;
     });
     try {
@@ -159,12 +205,22 @@ function removeWorkflowStep(i) {
   if (workflowBuilder.steps.length === 1)
     return toast("Keep at least one step.");
   workflowBuilder.steps.splice(i, 1);
+  for (const step of workflowBuilder.steps)
+    if (step.condition) {
+      if (step.condition.step === i) delete step.condition;
+      else if (step.condition.step > i) step.condition.step--;
+    }
   drawWorkflowBuilder();
 }
 function moveWorkflowStep(i, d) {
   captureWorkflowBuilder();
   const a = workflowBuilder.steps;
   [a[i], a[i + d]] = [a[i + d], a[i]];
+  for (const step of a)
+    if (step.condition) {
+      if (step.condition.step === i) step.condition.step = i + d;
+      else if (step.condition.step === i + d) step.condition.step = i;
+    }
   drawWorkflowBuilder();
 }
 function changeWorkflowKind(i) {
@@ -201,22 +257,21 @@ function startWorkflow(id) {
 }
 async function inspectWorkflowRun(id) {
   try {
-    const run = await api("workflow-runs/" + id, undefined, "GET");
+    const run = await api("workflow-runs/" + id, undefined, "GET"),
+      pending = run.status === "waiting_approval" ? run.approvalState : null;
     modal(
       esc(run.name),
-      `<div class="run-detail-heading">${runStatus(run.status)}<small>Template v${run.templateVersion} · ${run.documentIds.length} source documents</small><button class="secondary" onclick="inspectWorkflowRun('${id}')">Refresh status</button></div>${run.error ? `<p class="autherror">${esc(run.error)}</p>` : ""}<p>${esc(run.input)}</p><ol class="run-timeline">${run.steps
+      `<div class="run-detail-heading">${runStatus(run.status)}<small>Template v${run.templateVersion} · ${run.documentIds.length} source documents${run.initiatorEmail ? " · Started by " + esc(run.initiatorEmail) : ""}</small><button class="secondary" onclick="inspectWorkflowRun('${id}')">Refresh status</button></div>${run.error ? `<p class="autherror">${esc(run.error)}</p>` : ""}<p>${esc(run.input)}</p>${pending ? `<section class="operations-note"><strong>${pending.validApprovals}/${pending.requiredApprovals} required approvals currently count</strong><p>${pending.pendingApprovals} more distinct approval${pending.pendingApprovals === 1 ? "" : "s"} required.${pending.independent ? " The initiator cannot approve or reject this gate." : " The initiator may act as a reviewer."} Each reviewer must retain matter access before later steps execute.</p>${pending.canApprove ? "" : "<p>You cannot add a decision at this gate. Another eligible reviewer with matter access is required.</p>"}</section>` : ""}<ol class="run-timeline">${run.steps
         .map((s, i) => {
           const out = run.outputs.find(
               (o) => o.step === i && o.kind !== "approval",
             ),
-            approval = run.outputs.find(
-              (o) => o.step === i && o.kind === "approval",
-            );
-          return `<li class="${i < run.stepIndex ? "complete" : i === run.stepIndex ? "current" : ""}"><strong>${esc(s.name)}</strong><small>${esc(s.kind)}${i < run.stepIndex ? " · Complete" : ""}</small>${out ? `<button class="textbutton" onclick="openWorkflowArtifact('${id}',${i})">Open ${esc(out.kind)} →</button>` : ""}${approval ? `<p>${esc(approval.decision)} by ${esc(approval.actor)}: ${esc(approval.note)}</p>` : ""}</li>`;
+            approvals = run.approvalStates?.find((a) => a.step === i);
+          return `<li class="${i < run.stepIndex ? "complete" : i === run.stepIndex ? "current" : ""}"><strong>${esc(s.name)}</strong><small>${esc(s.kind === "approval" ? approvalPolicyLabel(s) : s.kind)}${i < run.stepIndex ? " · Complete" : ""}</small>${out?.skipped ? `<p>Skipped: ${esc(out.reason)}</p>` : out ? `<button class="textbutton" onclick="openWorkflowArtifact('${id}',${i})">Open ${esc(out.kind)} →</button>` : ""}${approvals ? approvals.decisions.map((a) => `<p>${esc(a.decision)} by ${esc(a.actor)} · ${esc(new Date(a.created).toLocaleString())}${a.valid ? "" : " · Reviewer no longer has eligible access"}<br>${esc(a.note)}</p>`).join("") : ""}</li>`;
         })
         .join(
           "",
-        )}</ol>${editable() ? `<div class="rich-actions">${run.status === "waiting_approval" ? `<label>Review note<textarea id="approval-note" maxlength="5000"></textarea></label><button class="primary" onclick="decideWorkflow('${id}',${run.revision},'approve')">Approve and continue</button><button class="secondary" onclick="decideWorkflow('${id}',${run.revision},'reject')">Reject</button>` : ""}${run.status === "failed" ? `<button class="primary" onclick="decideWorkflow('${id}',${run.revision},'retry')">Retry failed step</button>` : ""}${!["completed", "cancelled"].includes(run.status) ? `<button class="secondary" onclick="decideWorkflow('${id}',${run.revision},'cancel')">Cancel run</button>` : ""}</div>` : ""}`,
+        )}</ol>${editable() ? `<div class="rich-actions">${pending?.canApprove ? `<label>Review note<textarea id="approval-note" maxlength="5000"></textarea></label><button class="primary" onclick="decideWorkflow('${id}',${run.revision},'approve')">${pending.requiredApprovals > 1 ? "Record approval" : "Approve and continue"}</button><button class="secondary" onclick="decideWorkflow('${id}',${run.revision},'reject')">Reject</button>` : ""}${run.status === "failed" ? `<button class="primary" onclick="decideWorkflow('${id}',${run.revision},'retry')">Retry failed step</button>` : ""}${!["completed", "cancelled"].includes(run.status) ? `<button class="secondary" onclick="decideWorkflow('${id}',${run.revision},'cancel')">Cancel run</button>` : ""}</div>` : ""}`,
     );
   } catch (e) {
     toast(e.message);
@@ -361,6 +416,47 @@ async function skillHistory(id) {
         )
         .join("") ||
         "<p>No saved revisions yet. The current skill is version 1.</p>",
+    );
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+function workflowSchedulePanel(schedules) {
+  return `<div class="sectiontitle"><h2>Scheduled runs</h2></div><p>Schedules run while Counsel is running. They preserve the creator's permissions, never overlap their previous active run, and stop at every approval gate. Missed intervals are coalesced.</p><div class="recentlist">${
+    schedules
+      .filter((s) => s.matterId === matterId)
+      .map(
+        (s) =>
+          `<article class="draft-comment"><strong>${esc(workflowCache.templates.find((t) => t.id === s.templateId)?.name || "Workflow")}</strong><p>Every ${s.intervalMinutes} minutes � ${s.enabled ? "Enabled" : "Disabled"} � next ${new Date(s.nextAt).toLocaleString()}</p>${s.lastError ? `<p>${esc(s.lastError)}</p>` : ""}${s.lastRunId ? `<button class="textbutton" onclick="inspectWorkflowRun('${s.lastRunId}')">Latest run</button>` : ""}${editable() ? `<button class="secondary" onclick="toggleWorkflowSchedule('${s.id}',${!s.enabled})">${s.enabled ? "Disable" : "Enable"}</button>` : ""}</article>`,
+      )
+      .join("") || "<p>No schedules for this matter.</p>"
+  }</div>`;
+}
+function scheduleWorkflow(id) {
+  formModal(
+    "Schedule workflow",
+    `<p>Runs use the latest saved template and current source versions under your current access. Explicit source selections are not inherited from manual runs. Configured model generation can consume provider usage. Every approval gate still requires a person.</p>${field("input", "Instructions for each run", "What should this workflow do?", true)}<label>Repeat every (minutes)<input name="intervalMinutes" type="number" min="60" max="525600" value="1440" required></label><label><input name="enabled" type="checkbox"> Enable scheduled execution after this interval</label>`,
+    async (f) => {
+      await api("workflow-schedules", {
+        templateId: id,
+        run: { matterId, input: f.get("input") || "" },
+        intervalMinutes: Number(f.get("intervalMinutes")),
+        enabled: f.get("enabled") === "on",
+      });
+      await loadWorkflowViews();
+    },
+    "Save schedule",
+  );
+}
+async function toggleWorkflowSchedule(id, enabled) {
+  try {
+    await api("workflow-schedules/" + id, { enabled }, "PATCH");
+    await loadWorkflowViews();
+    toast(
+      enabled
+        ? "Schedule enabled; interval restarted"
+        : "Schedule disabled; existing runs remain available",
     );
   } catch (e) {
     toast(e.message);

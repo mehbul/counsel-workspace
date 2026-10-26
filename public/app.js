@@ -24,6 +24,8 @@ const icons = {
   documents: "▤",
   review: "▦",
   compare: "⇆",
+  research: "⌕",
+  portal: "↗",
   editor: "▧",
   workflows: "⌘",
   intake: "↳",
@@ -105,6 +107,10 @@ function render() {
     ["documents", "Documents"],
     ["review", "Tabular review"],
     ["compare", "Compare"],
+    ["research", "Legal research"],
+    ...(editable() && !authState?.personal
+      ? [["portal", "Client portal"]]
+      : []),
     ["editor", "Editor"],
     ["workflows", "Workflows"],
     ["intake", "Intake"],
@@ -117,7 +123,7 @@ function render() {
     ["activity", "Activity"],
   ];
   $("#app").innerHTML =
-    `<aside><a class="brand" href="#" onclick="go('home');return false"><span class="brandmark">c</span>counsel<span class="beta">WORKSPACE</span></a><div class="workspace"><span class="avatar">CL</span><div>${esc(authState?.user?.workspace)}<small>${esc(authState?.user?.role)} access</small></div></div><button class="newchat" onclick="go('assistant')">＋ New conversation</button><nav>${nav.map(([v, label]) => `<button class="${view === v ? "selected" : ""}" onclick="go('${v}')"><span>${icons[v]}</span>${label}</button>`).join("")}</nav><div class="aside-bottom"><div class="local-note"><span class="dot"></span>${esc(S.aiLabel || (S.aiAvailable ? "AI provider configured" : "Local evidence mode"))}<small>Grounded in your documents</small></div><button class="profile accountbutton" onclick="account()"><span class="avatar">Y</span><div>${esc(authState?.user?.email)}<small>Account and workspace settings</small></div></button></div></aside><main><header><div class="breadcrumbs">Workspace <span>/</span>${esc(nav.find((n) => n[0] === view)?.[1])}</div><div class="header-right"><span class="privacy">◈ Private workspace</span><button class="avatar tiny" onclick="account()" aria-label="Account">Y</button></div></header><div class="page ${view === "assistant" ? "chatpage" : ""}">${content()}</div></main>`;
+    `<aside><a class="brand" href="#" onclick="go('home');return false"><span class="brandmark">c</span>counsel<span class="beta">WORKSPACE</span></a><div class="workspace"><span class="avatar">CL</span><div>${esc(authState?.user?.workspace)}<small>${authState?.personal ? "Personal · this computer" : esc(authState?.user?.role) + " access"}</small></div></div><button class="newchat" onclick="go('assistant')">＋ New conversation</button><nav>${nav.map(([v, label]) => `<button class="${view === v ? "selected" : ""}" onclick="go('${v}')"><span>${icons[v]}</span>${label}</button>`).join("")}</nav><div class="aside-bottom"><div class="local-note"><span class="dot"></span>${esc(S.aiLabel || (S.aiAvailable ? "AI provider configured" : "Local evidence mode"))}<small>Grounded in your documents</small></div><button class="profile accountbutton" onclick="account()"><span class="avatar">Y</span><div>${authState?.personal ? "Personal settings" : esc(authState?.user?.email)}<small>${authState?.personal ? "Local workspace and assistants" : "Account and workspace settings"}</small></div></button></div></aside><main><header><div class="breadcrumbs">Workspace <span>/</span>${esc(nav.find((n) => n[0] === view)?.[1])}</div><div class="header-right"><span class="privacy">◈ ${authState?.personal ? "Personal · local only" : "Private workspace"}</span><button class="avatar tiny" onclick="account()" aria-label="${authState?.personal ? "Settings" : "Account"}">${authState?.personal ? "P" : "Y"}</button></div></header><div class="page ${view === "assistant" ? "chatpage" : ""}">${content()}</div></main>`;
   bind();
 }
 function heading(k, title, sub, action = "") {
@@ -139,6 +145,10 @@ function cards() {
 }
 function content() {
   switch (view) {
+    case "portal":
+      return portalPanel();
+    case "research":
+      return researchPanel();
     case "home":
       return `<div class="welcome"><div class="eyebrow">YOUR LEGAL WORKSPACE</div><h1>Good work starts here.</h1><p>A little less groundwork. A little more perspective.</p></div><div class="home-prompt"><span class="spark">✳</span><textarea id="home-query" placeholder="What would you like to work on today?" aria-label="Ask the assistant"></textarea><div><span>▣ ${esc(matter()?.name || "Create a matter to begin")}</span><button class="send" id="home-send" aria-label="Send question">↑</button></div></div><div class="quick-actions">${[
         ["review", "▦", "Review documents", "Find the details that matter."],
@@ -183,7 +193,7 @@ function content() {
               .filter((m) => m.matterId === matterId)
               .map(
                 (m) =>
-                  `<div class="userbubble">${esc(m.query)}</div><article class="answer"><span class="answer-mark">✳</span><div><small>${esc(m.mode)}</small><div class="answertext">${esc(m.text)}</div><button class="textbutton" onclick="inspectReferences('messages','${m.id}')">Check references${m.evidence?.status === "needs_review" ? " · Needs attention" : ""}</button><div class="citations">${m.citations.map((c, i) => `<button onclick="showDoc('${c.documentId}',${c.paragraph})">[${i + 1}] ${esc(c.name)} ↗</button>`).join("")}</div></div></article>`,
+                  `<div class="userbubble">${esc(m.query)}</div><article class="answer"><span class="answer-mark">✳</span><div><small>${esc(m.mode)}</small><div class="answertext">${esc(m.text)}</div>${m.retrieval ? `<button class="textbutton" onclick="showSourceCoverage('${m.id}')">Source coverage</button>` : ""}<button class="textbutton" onclick="inspectReferences('messages','${m.id}')">Check references${m.evidence?.status === "needs_review" ? " · Needs attention" : ""}</button><div class="citations">${m.citations.map((c, i) => `<button onclick="showDoc('${c.documentId}',${c.paragraph})">[${i + 1}] ${esc(c.name)} ↗</button>`).join("")}</div></div></article>`,
               )
               .join("")
           : `<div class="chat-empty"><span>✳</span><h1>A second perspective.<br>On your terms.</h1><p>Ask about clauses, compare agreements, or find the evidence.</p><div class="suggestions">${["What are the governing law provisions?", "Compare liability across the agreements", "Find assignment restrictions"].map((q) => `<button onclick="$('#query').value=this.textContent">${q}</button>`).join("")}</div></div>`
@@ -196,7 +206,7 @@ function content() {
           "ANALYZE AT SCALE",
           "Tabular review",
           "Every finding connected to evidence.",
-          '<button class="primary" onclick="newReview()">＋ New review</button>',
+          '<button class="secondary" onclick="openPlaybooks()">Playbooks</button> <button class="primary" onclick="newReview()">＋ New review</button>',
         ) +
         `<div class="toolbar">${selector()}${r ? `<select id="review-select" aria-label="Select review">${reviews.map((x) => `<option value="${x.id}" ${x.id === r.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select><button class="secondary" onclick="exportReview('${r.id}')">↓ Export all CSV</button>` : ""}</div>` +
         (r
@@ -217,7 +227,7 @@ function content() {
           "Compare documents",
           "Compare source passages, inspect changed wording, and identify gaps.",
           editable()
-            ? '<button class="primary" onclick="newComparison()">＋ New comparison</button>'
+            ? '<button class="secondary" onclick="compareCompleteDocuments()">Full text / Word redline</button> <button class="primary" onclick="newComparison()">＋ New comparison</button>'
             : "",
         ) +
         `<div class="toolbar">${selector()}</div><div id="comparison-content">Loading comparisons…</div>`
@@ -454,7 +464,7 @@ function showDoc(id, paragraph) {
   if (!d) return toast("Document unavailable.");
   modal(
     esc(d.name),
-    `<div class="sourceviewer"><div class="source-meta">${d.sample ? "SAMPLE DOCUMENT · " : ""}SOURCE TEXT${d.supersededBy ? " · PREVIOUS VERSION" : ""}</div>${d.text
+    `${d.original ? `<a class="secondary" href="${documentTools.originalUrl(d.id)}">Download original</a>` : ""}${d.pages?.length ? `<p>${d.pages.length} PDF pages · ${d.ocr?.needed ? "OCR needed" : "Text extracted"}</p>` : ""}<div class="sourceviewer"><div class="source-meta">${d.sample ? "SAMPLE DOCUMENT · " : ""}SOURCE TEXT${d.supersededBy ? " · PREVIOUS VERSION" : ""}</div>${d.text
       .split(/\n\s*\n/)
       .map(
         (p, i) =>
@@ -566,6 +576,8 @@ function uploadDocuments() {
   $("#upload")?.click();
 }
 function bind() {
+  if (view === "portal") loadPortalManager();
+  if (view === "research") bindResearch();
   if (view === "compare") loadComparisons();
   if (["workflows", "intake", "monitors"].includes(view)) loadWorkflowViews();
   if (view === "integrations") loadConnectors();

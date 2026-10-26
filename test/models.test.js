@@ -1,6 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { modelConfiguration, generate } = require("../models");
+const { profileConfiguration } = require("../models");
 test("evidence mode needs no model credentials and invalid endpoint configuration fails closed", () => {
   assert.equal(modelConfiguration({}).enabled, false);
   assert.equal(
@@ -21,6 +22,87 @@ test("evidence mode needs no model credentials and invalid endpoint configuratio
     }).enabled,
     false,
   );
+});
+test("native Anthropic separates system messages, applies budgets and returns only normalized usage", async () => {
+  const config = profileConfiguration({
+    provider: "anthropic",
+    model: "explicit-model",
+    apiKey: "secret",
+    contextTokens: 8000,
+    maxOutputTokens: 256,
+  });
+  const result = await generate(
+    [
+      { role: "system", content: "Use evidence." },
+      { role: "user", content: "Question" },
+    ],
+    {
+      config,
+      fetch: async (url, init) => {
+        assert.equal(url, "https://api.anthropic.com/v1/messages");
+        assert.equal(init.headers["x-api-key"], "secret");
+        assert.equal(init.headers.Authorization, undefined);
+        const body = JSON.parse(init.body);
+        assert.equal(body.system, "Use evidence.");
+        assert.equal(body.messages.length, 1);
+        assert.equal(body.max_tokens, 256);
+        return Response.json({
+          content: [{ type: "text", text: "Answer" }],
+          usage: { input_tokens: 25, output_tokens: 3, private: "ignore" },
+        });
+      },
+    },
+  );
+  assert.equal(result.text, "Answer");
+  assert.equal(result.model, "explicit-model");
+  assert.equal(result.usage.inputTokens, 25);
+  assert.equal(result.usage.outputTokens, 3);
+  assert.equal(result.usage.private, undefined);
+});
+test("over-budget and aborted requests never invoke provider; in-flight cancellation propagates", async () => {
+  const config = profileConfiguration({
+    provider: "openai",
+    model: "test",
+    apiKey: "secret",
+    contextTokens: 1024,
+    maxOutputTokens: 64,
+  });
+  await assert.rejects(
+    generate([{ role: "user", content: "x".repeat(1024) }], {
+      config,
+      fetch: async () => {
+        throw Error("must not call");
+      },
+    }),
+    /context budget/,
+  );
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    generate([], {
+      config,
+      signal: controller.signal,
+      fetch: async () => {
+        throw Error("must not call");
+      },
+    }),
+    { name: "AbortError" },
+  );
+  const active = new AbortController();
+  const pending = generate([], {
+    config,
+    signal: active.signal,
+    fetch: async (url, init) =>
+      new Promise((resolve, reject) =>
+        init.signal.addEventListener(
+          "abort",
+          () => reject(init.signal.reason),
+          { once: true },
+        ),
+      ),
+  });
+  active.abort();
+  await assert.rejects(pending, { name: "AbortError" });
 });
 test("local Ollama uses its native non-streaming API without provider credentials", async () => {
   const result = await generate(

@@ -1,4 +1,5 @@
 // Deterministic lexical retrieval. This is BM25-style ranking, not semantic legal reasoning.
+const { retrieveClause } = require("./clause-review");
 const STOP = new Set(
   "a an and are as at be been by can could do does each for from give has have how i in into is it its me my of on or our please provide show tell than that the their them there these they this those to under us was we were what when where which who will with would you your find identify compare across document documents source sources agreement agreements contract contracts clause clauses provision provisions section sections matter supplied relevant stated applies apply".split(
     " ",
@@ -200,6 +201,8 @@ function diversify(records, limit, maxPerDocument) {
 function retrieve(query, docs, options = {}) {
   if (typeof query !== "string" || !query.trim() || !Array.isArray(docs))
     return [];
+  const clause = retrieveClause(query, docs, options);
+  if (clause) return clause;
   const limit = bounded(options.limit, 8, 1, 20),
     maxChars = bounded(options.maxChars, 3000, 128, 4000),
     maxPerDocument = bounded(options.maxPerDocument, 3, 1, 20),

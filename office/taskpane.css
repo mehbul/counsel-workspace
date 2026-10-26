@@ -1,0 +1,91 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  color: #1b302d;
+  background: #f7f8f5;
+}
+body {
+  margin: 0;
+}
+main {
+  padding: 20px;
+  max-width: 560px;
+  margin: auto;
+}
+h1 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.1;
+  margin: 8px 0 16px;
+}
+h2 {
+  font-size: 16px;
+  margin-top: 0;
+}
+p {
+  line-height: 1.5;
+  font-size: 13px;
+}
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+section {
+  border-top: 1px solid #ced7d0;
+  padding: 20px 0;
+}
+label {
+  display: block;
+  font-size: 12px;
+  margin: 12px 0 6px;
+}
+input,
+select,
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #aabbb0;
+  border-radius: 4px;
+  background: white;
+  font: inherit;
+  font-size: 13px;
+}
+textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+button {
+  border: 1px solid #234e41;
+  border-radius: 4px;
+  background: #234e41;
+  color: white;
+  padding: 10px 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+button.secondary {
+  background: transparent;
+  color: #234e41;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.notice {
+  color: #5e6e64;
+  font-size: 11px;
+}
+#status {
+  background: #e4ece4;
+  padding: 12px;
+  overflow-wrap: anywhere;
+}

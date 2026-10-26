@@ -1,7 +1,7 @@
 const { fork } = require("node:child_process");
 const path = require("node:path");
 let running = 0;
-function parseDocument(buffer, ext) {
+function parseDocumentDetailed(buffer, ext) {
   if (running >= 2)
     return Promise.reject(Error("Document processing is busy. Retry shortly."));
   running++;
@@ -43,7 +43,11 @@ function parseDocument(buffer, ext) {
             "Document parser exited unexpectedly. The application is still available.",
           ),
         );
-      finish(result.error ? Error(result.error) : null, result.text);
+      finish(result.error ? Error(result.error) : null, {
+        text: result.text,
+        pages: result.pages || [],
+        ocr: result.ocr,
+      });
     });
     child.send({ data: buffer, ext }, (err) => {
       if (err) {
@@ -53,4 +57,15 @@ function parseDocument(buffer, ext) {
     });
   });
 }
-module.exports = { parseDocument };
+async function parseDocument(buffer, ext) {
+  return (await parseDocumentDetailed(buffer, ext)).text;
+}
+function ocrStatus() {
+  return {
+    available: false,
+    enabled: false,
+    reason:
+      "No OCR engine is configured. Image-only PDFs require a separate, explicitly enabled OCR integration.",
+  };
+}
+module.exports = { parseDocument, parseDocumentDetailed, ocrStatus };

@@ -12,10 +12,12 @@ Requires Node 24.15 or newer.
 
 ```sh
 npm ci
-npm start
+npm run start:personal
 ```
 
-Open http://127.0.0.1:3000. The service binds to loopback. SQLite data is stored in `data/workspace.db`. On first run, open the setup screen and use the one-time token in `data/bootstrap-token` to create the owner account. Existing prototype data is preserved and transferred to that owner. Three synthetic contracts seed new workspaces. Upload PDF, DOCX, TXT, MD or CSV documents (20 MB each). Scanned PDFs require external OCR first.
+Open http://127.0.0.1:3000. Personal mode opens directly with no app login, email, password or signup. It binds only to this computer and keeps its SQLite data in `data/personal/workspace.db`, separate from team data. See [personal and team modes](docs/PERSONAL-MODE.md).
+
+For an authenticated shared installation, run `npm start` or use Docker. Team data stays in `data/workspace.db`. On first team run, use the one-time token in `data/bootstrap-token` to create the owner account. Existing prototype data is preserved and transferred to that owner. Three synthetic contracts seed new workspaces. Upload PDF, DOCX, TXT, MD or CSV documents (20 MB each). Scanned PDFs require external OCR first.
 
 ## Features
 
@@ -26,11 +28,14 @@ Open http://127.0.0.1:3000. The service binds to loopback. SQLite data is stored
 - Review tables with prompt columns, evidence inspection, editable findings, locks, review status, filtering, sorting and pagination; CSV export.
 - Editable drafting workspace and real DOCX export.
 - Reusable instructions, three executable workflow templates, task lists and activity history.
+- Optional independent approval and distinct-reviewer quorum, revalidated before later workflow actions.
+- A guest-only client portal with explicit document and reviewed-text publication and revocation.
+- US Federal Register research, official PDF imports and scheduled publication watches.
 - MCP tools for scoped evidence reading and host-authored drafts, review tables and tasks, with expiring/revocable read or write keys.
 - Optional local Ollama or OpenAI-compatible model generation; explicit provider selection prevents accidental API usage.
 - Responsive layout and accessible native forms/dialogs.
 
-Evidence-only mode uses deterministic BM25-style passage ranking, legal-concept aliases, document diversity and bounded exact-quote windows. Its review tables extract matching passages and its drafts compile source excerpts. Connected assistants can instead reason over those sources and save their own unreviewed analyses, without Counsel making model API calls. No external legal-research corpus or case-law verification is included.
+Evidence-only mode uses deterministic BM25-style passage ranking, legal-concept aliases, document diversity and bounded exact-quote windows. Its review tables extract matching passages and its drafts compile source excerpts. Connected assistants can instead reason over those sources and save their own unreviewed analyses, without Counsel making model API calls. Public Federal Register publication research is available separately. Comprehensive legal research and case-law treatment verification remain incomplete.
 
 ## Optional generated analysis
 
@@ -51,7 +56,7 @@ npm test
 npm run benchmark
 ```
 
-Integration tests use isolated in-memory databases and temporary data directories. They verify import, scoped citations, comparisons, reference checks, source selection, extraction, locks, edits, collaboration, security regressions and DOCX export. See [quality checks and measured limits](docs/QUALITY.md) for the synthetic retrieval baseline and live assistant acceptance test.
+Integration tests use isolated in-memory databases and temporary data directories. They verify import, scoped citations, comparisons, reference checks, source selection, extraction, locks, edits, collaboration, security regressions and DOCX export. See [quality checks and measured limits](docs/QUALITY.md) and the [external CUAD evaluation](docs/LEGAL-EVALUATION.md) for measured results, including poor baseline extraction and abstention.
 
 ## Self-hosted deployment
 

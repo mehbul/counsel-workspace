@@ -17,6 +17,7 @@ const token = () => randomBytes(32).toString("hex");
 const passwordSchema = z.string().min(14).max(256);
 const emailSchema = z.string().trim().toLowerCase().email().max(254);
 function installSecurity(app, db, initial) {
+  const personal = require("./personal").createPersonalMode(db);
   const production = process.env.NODE_ENV === "production";
   if (
     production &&
@@ -33,6 +34,7 @@ function installSecurity(app, db, initial) {
     CREATE TABLE IF NOT EXISTS audit(id TEXT PRIMARY KEY,workspace_id TEXT,actor TEXT,action TEXT NOT NULL,resource TEXT,created TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS matter_access(user_id TEXT NOT NULL,matter_id TEXT NOT NULL,workspace_id TEXT NOT NULL,PRIMARY KEY(user_id,matter_id));`);
+  if (personal) personal.initialize(initial);
   const setupFile = path.join(
     process.env.DATA_DIR || path.join(__dirname, "data"),
     "bootstrap-token",
@@ -51,6 +53,14 @@ function installSecurity(app, db, initial) {
   }
   app.disable("x-powered-by");
   app.set("trust proxy", process.env.TRUST_PROXY === "1" ? 1 : false);
+  app.use((req, res, next) => {
+    if (personal && !personal.validateRequest(req))
+      return res.status(403).set("Cache-Control", "no-store").json({
+        error:
+          "Personal mode accepts direct same-origin loopback requests only.",
+      });
+    next();
+  });
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -189,6 +199,19 @@ function installSecurity(app, db, initial) {
     return csrf;
   }
   app.get("/api/auth/me", (req, res) => {
+    if (personal) {
+      const owner = personal.identity(),
+        active = session(req);
+      if (!owner)
+        return res.status(503).json({ error: "Personal account unavailable." });
+      const csrf =
+        active?.id === owner.id ? active.csrf : newSession(res, owner);
+      return res.json({
+        personal: true,
+        user: { email: owner.email, role: owner.role, workspace: owner.name },
+        csrf,
+      });
+    }
     const s = session(req);
     res.json(
       s
@@ -206,6 +229,10 @@ function installSecurity(app, db, initial) {
     "/api/auth/setup",
     loginLimit,
     wrap(async (req, res) => {
+      if (personal)
+        return res
+          .status(403)
+          .json({ error: "Personal mode does not use account setup." });
       const b = z
         .object({
           token: z.string().length(64),
@@ -266,6 +293,10 @@ function installSecurity(app, db, initial) {
     "/api/auth/login",
     loginLimit,
     wrap(async (req, res) => {
+      if (personal)
+        return res
+          .status(403)
+          .json({ error: "Personal mode does not use password sign-in." });
       const b = z
         .object({ email: emailSchema, password: z.string().max(256) })
         .parse(req.body);
@@ -308,6 +339,10 @@ function installSecurity(app, db, initial) {
     "/api/auth/password",
     loginLimit,
     wrap(async (req, res) => {
+      if (personal)
+        return res
+          .status(403)
+          .json({ error: "Personal mode has no login password." });
       const b = z
         .object({
           currentPassword: z.string().max(256),
@@ -343,6 +378,28 @@ function installSecurity(app, db, initial) {
       res.json({ csrf: newSession(res, u) });
     }),
   );
+  // A client guest has no internal workspace API surface, including future routes.
+  // Authentication endpoints above are shared; only published portal reads proceed.
+  app.use("/api", (req, res, next) => {
+    if (
+      personal &&
+      (req.path.startsWith("/portal") ||
+        (req.path.startsWith("/admin") && req.path !== "/admin/audit"))
+    )
+      return res.status(403).json({
+        error:
+          "Team accounts and client publication are disabled in personal mode.",
+      });
+    if (
+      req.user.role === "guest" &&
+      !(
+        ["GET", "HEAD"].includes(req.method) &&
+        /^\/portal\/items(?:\/[a-f0-9-]{36})?$/.test(req.path)
+      )
+    )
+      return res.status(403).json({ error: "Client portal access only." });
+    next();
+  });
   app.use("/api/admin", (req, res, next) =>
     req.user.role === "owner"
       ? next()
@@ -364,7 +421,7 @@ function installSecurity(app, db, initial) {
         .object({
           email: emailSchema,
           password: passwordSchema,
-          role: z.enum(["editor", "viewer"]),
+          role: z.enum(["editor", "viewer", "guest"]),
         })
         .parse(req.body);
       if (db.prepare("SELECT id FROM users WHERE email=?").get(b.email))
@@ -590,7 +647,8 @@ function installSecurity(app, db, initial) {
           "SELECT * FROM users WHERE id=? AND workspace_id=? AND disabled=0",
         )
         .get(userId, key);
-      if (!user || user.role === "viewer") throw Error("Run access revoked");
+      if (!user || !["owner", "editor"].includes(user.role))
+        throw Error("Run access revoked");
       const row = db
         .prepare("SELECT value FROM workspaces WHERE id=?")
         .get(key);
@@ -636,7 +694,7 @@ function installSecurity(app, db, initial) {
       if (!q.count) queues.delete(key);
     }
   }
-  return { context, audit, runWorkspace, session };
+  return { context, audit, runWorkspace, session, personal };
 }
 const text = (max = 1000) => z.string().trim().min(1).max(max);
 const schemas = {

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Counsel for Word</title>
+    <link rel="stylesheet" href="/office/taskpane.css" />
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script src="/office/actions.js" defer></script>
+    <script src="/office/taskpane.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">COUNSEL · WORD</p>
+      <h1>Review in your document.</h1>
+      <p>
+        Connect an existing matter, preview text, and insert reviewed wording as
+        tracked changes.
+      </p>
+      <section aria-labelledby="connect-heading">
+        <h2 id="connect-heading">Connect to Counsel</h2>
+        <p>
+          Create a matter-scoped assistant key in Counsel. A write key is needed
+          to save text. The key stays in this task pane's memory until you
+          disconnect or close it.
+        </p>
+        <label for="connection-key">Scoped assistant key</label>
+        <input
+          id="connection-key"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="row">
+          <button id="connect">Connect</button
+          ><button id="disconnect" class="secondary">Disconnect</button>
+        </div>
+      </section>
+      <section aria-labelledby="matter-heading">
+        <h2 id="matter-heading">Matter and draft</h2>
+        <label for="matter">Matter</label
+        ><select id="matter" disabled>
+          <option value="">Connect first</option>
+        </select>
+        <label for="draft">Saved Counsel draft</label
+        ><select id="draft" disabled>
+          <option value="">Choose a matter</option>
+        </select>
+        <div class="row">
+          <button id="refresh-drafts" class="secondary" disabled>
+            Refresh drafts</button
+          ><button id="load-draft" disabled>Preview draft</button>
+        </div>
+      </section>
+      <section aria-labelledby="preview-heading">
+        <h2 id="preview-heading">Text preview</h2>
+        <div class="row">
+          <button id="read-selection" class="secondary" disabled>
+            Read selection</button
+          ><button id="read-document" class="secondary" disabled>
+            Read main document
+          </button>
+        </div>
+        <label for="title">Name for a new Counsel source or draft</label
+        ><input id="title" maxlength="200" value="Word document text" />
+        <label for="preview">Review and edit before saving or inserting</label
+        ><textarea id="preview" maxlength="200000" rows="14"></textarea>
+        <p class="notice">
+          This bridge transfers plain text only. Main document text excludes
+          headers, footers and other separate Word stories. Original formatting,
+          images, fields and existing revisions are not imported. It never
+          replaces the original Word file.
+        </p>
+        <div class="row">
+          <button id="save-source" disabled>Save as new source</button
+          ><button id="save-draft" class="secondary" disabled>
+            Save as new draft
+          </button>
+        </div>
+        <button id="insert" disabled>
+          Insert preview after selection with tracked changes
+        </button>
+        <p class="notice">
+          Insertion requires WordApi 1.4. It temporarily enables Track All and
+          restores your prior tracking mode. Use Word's review controls to
+          accept or reject the result. Review drafts and evidence before
+          inserting.
+        </p>
+      </section>
+      <p id="status" role="status" aria-live="polite">Waiting for Word.</p>
+    </main>
+  </body>
+</html>

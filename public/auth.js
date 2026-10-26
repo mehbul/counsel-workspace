@@ -1,6 +1,17 @@
 let authState = null;
 async function loadSession() {
   authState = await (await fetch("/api/auth/me")).json();
+  if (authState.user) {
+    const guest = authState.user.role === "guest";
+    if (guest && location.pathname !== "/portal.html") {
+      location.replace("/portal.html");
+      return false;
+    }
+    if (!guest && location.pathname === "/portal.html") {
+      location.replace("/");
+      return false;
+    }
+  }
   return !!authState.user;
 }
 function authScreen(error = "") {
@@ -18,7 +29,7 @@ function authScreen(error = "") {
       });
       const d = await r.json();
       if (!r.ok) throw Error(d.error || "Unable to sign in");
-      await loadSession();
+      if (!(await loadSession())) return;
       await refresh();
       view = "home";
       render();
@@ -38,9 +49,14 @@ async function logout() {
   }
 }
 function account() {
+  if (authState.personal)
+    return modal(
+      "Personal workspace",
+      '<p>This workspace opens directly on your computer. Access is limited to direct local browser connections.</p><button class="secondary" onclick="assistantConnections()">Connect an assistant</button> <button class="secondary" onclick="openModelSettings()">Model settings</button> <button class="secondary" onclick="auditLog()">View audit log</button>',
+    );
   modal(
     "Your account",
-    `<p>${esc(authState.user.email)} · ${esc(authState.user.role)}</p><button class="secondary" onclick="changePassword()">Change password</button> ${authState.user.role !== "viewer" ? '<button class="secondary" onclick="assistantConnections()">Connect Codex / Claude</button>' : ""} ${authState.user.role === "owner" ? '<button class="secondary" onclick="manageMembers()">Manage members</button> <button class="secondary" onclick="auditLog()">Audit log</button> <button class="secondary" onclick="matterAccess()">Matter access</button>' : ""}<button class="primary" onclick="$('#modal').close();logout()">Sign out</button>`,
+    `<p>${esc(authState.user.email)} · ${esc(authState.user.role)}</p><button class="secondary" onclick="changePassword()">Change password</button> ${["owner", "editor"].includes(authState.user.role) ? '<button class="secondary" onclick="assistantConnections()">Connect an assistant</button>' : ""} ${authState.user.role === "owner" ? '<button class="secondary" onclick="openModelSettings()">Model settings</button> <button class="secondary" onclick="manageMembers()">Manage members</button> <button class="secondary" onclick="auditLog()">Audit log</button> <button class="secondary" onclick="matterAccess()">Matter access</button>' : ""}<button class="primary" onclick="$('#modal').close();logout()">Sign out</button>`,
   );
 }
 function changePassword() {
@@ -64,7 +80,7 @@ async function manageMembers() {
     const users = await (await fetch("/api/admin/users")).json();
     modal(
       "Workspace members",
-      `<p>Owners manage accounts. Editors can change workspace content; viewers can read and export.</p><div class="recentlist">${users.map((u) => `<div class="activityrow"><strong>${esc(u.email)}</strong><span>${esc(u.role)} ${u.disabled ? "· Disabled" : ""}</span>${u.role !== "owner" ? `<button class="secondary" onclick="toggleMember('${u.id}',${!u.disabled})">${u.disabled ? "Enable" : "Disable"}</button>` : ""}</div>`).join("")}</div><div class="modalfooter"><button class="primary" onclick="createMember()">Add member</button></div>`,
+      `<p>Owners manage accounts. Editors can change workspace content; viewers can read and export. Client guests can read only explicitly published items for their assigned matters.</p><div class="recentlist">${users.map((u) => `<div class="activityrow"><strong>${esc(u.email)}</strong><span>${esc(u.role)} ${u.disabled ? "· Disabled" : ""}</span>${u.role !== "owner" ? `<button class="secondary" onclick="toggleMember('${u.id}',${!u.disabled})">${u.disabled ? "Enable" : "Disable"}</button>` : ""}</div>`).join("")}</div><div class="modalfooter"><button class="primary" onclick="createMember()">Add member</button></div>`,
     );
   } catch (e) {
     toast(e.message);
@@ -75,7 +91,7 @@ function createMember() {
     "Add a workspace member",
     field("email", "Email") +
       field("password", "Temporary password — at least 14 characters") +
-      '<label>Role<select name="role"><option value="editor">Editor</option><option value="viewer">Viewer</option></select></label>',
+      '<label>Role<select name="role"><option value="editor">Editor</option><option value="viewer">Viewer</option><option value="guest">Client guest — portal only</option></select></label>',
     (f) => api("admin/users", Object.fromEntries(f)),
     "Create account",
   );
