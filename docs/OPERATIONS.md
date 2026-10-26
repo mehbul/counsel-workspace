@@ -62,7 +62,7 @@ npm run verify:archive -- path/to/archive.zip
 
 The verifier checks ZIP bounds, required files, checksum coverage, manifest counts, payload path prefixes, case-insensitive duplicate paths, original mode/counts and audit counts without extracting. Extracted archives can also be checked with `sha256sum -c SHA256SUMS` (or `shasum -a 256 -c SHA256SUMS`). On Windows, use PowerShell `Get-FileHash`; `sha256sum` is not built in.
 
-Archives are not encrypted or signed. Checksums detect changes made without updating `SHA256SUMS`; they do not establish who created or approved an archive. The owner audit subset is best-effort, matched by resource ID, capped and not independently immutable. The export event is written after the ZIP is built and is not included in that same archive. There is no import, restore or merge command. Use the SQLite backup procedure above for workspace recovery. See [MATTER-ARCHIVE.md](MATTER-ARCHIVE.md).
+Archives are not encrypted or signed. Checksums detect changes made without updating `SHA256SUMS`; they do not establish who created or approved an archive. The owner audit subset is best-effort, matched by resource ID, capped and not independently immutable. The export event is written after the ZIP is built and is not included in that same archive. A workspace owner can restore an archive with `POST /api/matters/archive/restore` under the documented collision and side-effect policy in [MATTER-ARCHIVE.md](MATTER-ARCHIVE.md); use the SQLite backup procedure above for whole-workspace recovery.
 
 ## Monitoring and upgrades
 

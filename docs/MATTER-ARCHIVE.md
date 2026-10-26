@@ -1,18 +1,19 @@
 # Matter archive exports
 
-Counsel can export one matter as a ZIP archive containing its records, readable source text, checksums and an optional copy of retained original files. This is a portability feature for a matter, not a full workspace backup and not an import format.
+Counsel can export one matter as a ZIP archive containing its records, readable source text, checksums and an optional copy of retained original files. This is a portability feature for a single matter, not a full workspace backup. An owner can also restore an archive as a new matter in a workspace, subject to the explicit side-effect and collision policy documented below.
 
-The implementation is in `matter-archive.js` and `zip.js`, the routes are registered by `server.js`, and the offline verifier is `scripts/verify-matter-archive.js`.
+The implementation is in `matter-archive.js` (export and restore), `matter-archive-verify.js` (shared integrity verifier) and `zip.js`; the routes are registered by `server.js`, and the offline verifier CLI is `scripts/verify-matter-archive.js`.
 
 ## Access and endpoints
 
-An owner or editor with current access to the matter can export it. Viewers and client-portal guests receive `403`. An editor whose matter grant was revoked receives `404`, as does a request for a matter in another workspace.
+An owner or editor with current access to the matter can export it. Viewers and client-portal guests receive `403`. An editor whose matter grant was revoked receives `404`, as does a request for a matter in another workspace. Restoring an archive requires a workspace owner; editors, viewers and guests receive `403`, and unauthenticated requests receive `401`.
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/matters/:id/archive/preview` | JSON counts, estimated sizes, warnings and audit availability. No archive is built. |
 | `GET /api/matters/:id/archive?originals=0` | Metadata and source-text archive. This is the default. |
 | `GET /api/matters/:id/archive?originals=1` | Full archive including retained original files. |
+| `POST /api/matters/archive/restore` | Owner-only restore of an archive ZIP as a new matter in this workspace. |
 
 `originals` accepts `0`, `1`, `false` or `true`; other values return `400`. A full export with no retained originals also returns `400`. The archive response includes `X-Counsel-Archive-SHA256`, which is the SHA-256 of the complete ZIP file. The export event is written to the workspace audit after the ZIP is built, so it is not part of that archive's audit subset.
 
@@ -83,6 +84,7 @@ Default limits:
 | Retained original bytes | 128 MiB |
 | ZIP entries | 4,000 |
 | Audit rows | 10,000 |
+| Restore upload size | 256 MiB |
 
 Over-limit exports return `413`. The metadata and retained-original limits apply independently. The audit cap is applied with a deterministic global ordering and a warning; the complete audit table remains in the workspace. The archive builder also rejects case-insensitive duplicate archive paths so extraction on Windows and default macOS filesystems cannot overwrite one payload with another, and limits generated file names to 180 UTF-8 bytes so they fit common filesystem component limits. The ZIP reader rejects path traversal, absolute paths, backslashes, control characters, encrypted entries, data descriptors, ZIP64, symbolic links, duplicate paths, unsupported compression methods and checksum or size mismatches.
 
@@ -113,16 +115,72 @@ On macOS use `shasum -a 256 -c SHA256SUMS`. On Windows PowerShell, compare each 
 
 `SHA256SUMS` covers every file except itself, including `manifest.json`. `manifest.json` lists `README.txt` and every payload file with its size and SHA-256, but does not list itself or `SHA256SUMS`, avoiding a circular dependency. The whole-ZIP digest is returned in the HTTP response header and is not stored inside the archive.
 
+## Restore
+
+An owner restores an archive with one request:
+
+```sh
+curl -H "Content-Type: multipart/form-data" \
+  -H "<session cookie and CSRF token>" \
+  -F "archive=@matter-archive.zip" \
+  -F "newIds=1" \
+  https://<workspace-host>/api/matters/archive/restore
+```
+
+Restores are incremental copies, not overwrites. The restore path verifies the archive the same way the offline verifier does (checksums, manifest consistency, per-file hashes), then validates structures and record limits, checks for identifier collisions against the target workspace, and only then writes anything. The response reports per-record counts and every policy decision as warnings; restore replacement of existing records is therefore always explicit rather than silent.
+
+### Request and response
+
+- `archive` — required ZIP file. Maximum 256 MiB (a full archive is bounded by the 128 MiB metadata and 128 MiB originals export limits). Oversized uploads return `413`.
+- `newIds` — optional field (`1` or `true`).
+- 200 — restored; body contains `matter` (id and name of the restored matter), `mode`, `counts` and `warnings`.
+- 400 — the archive failed verification or record validation; nothing was written.
+- 401/403 — not signed in, or not a workspace owner.
+- 409 — an identifier collision without `newIds`, or the restore would exceed the workspace document limit. Includes a hint to retry with `newIds=1`.
+- 413/500 — transport or server errors; nothing was written when the error came from this endpoint's own checks.
+
+Every record keeps an identifier from the source instance. Records are keyed by globally unique UUIDs, so records from different archives do not collide unless the same archive is restored more than once.
+
+### Collision policy
+
+Before writing, every archived record ID is compared against this instance — primary keys are instance-global, so a collision with any workspace's record fails the restore. Any collision — the same matter, document, review, draft, run, schedule, publication, job, comment, skill or template ID — fails with `409` and names the colliding record types. Nothing is overwritten or merged. Retrying with `newIds=1` instead remaps **every** archived record ID to a fresh UUID, and rewrites references inside records so the restored matter stays internally consistent: superseded document versions, review cells' document references, message citations, run step snapshots, schedule `lastRunId` values, template step skills, draft comments/checkpoints/suggestions and portal publication document references. The response warning says the matter was restored under fresh identifiers. Identifier remapping replaces collaborator references as well — workflow run actors and job users are recorded as the remapped IDs and resolve to workspace users only where the ID was already local.
+
+### Side-effect policy
+
+Archives record past execution state. Restoring never resumes execution on the target instance:
+
+| Record | Restore behavior |
+|---|---|
+| Jobs (`queued` or `running`) | Restored as `failed` with an explanatory error. They never run here, even though the job worker picks up queued work globally. |
+| Jobs (`completed`/`failed`) | Restored verbatim as records. |
+| Workflow runs without a final status (including `waiting_approval`) | Restored as `cancelled`. Final (`completed`, `cancelled`, `failed`) runs restore verbatim. |
+| Workflow schedules | Restored with the enabled flag off. Enabling recalculates the next run time from the interval, so imported schedules do not emit a catch-up burst. |
+| Research watches | Restored disabled. Watch scans perform live queries against public legal sources, so enabling remains an owner decision made after the restore. |
+| Client portal publications | Restored verbatim, including revoked state, with a warning that portal visibility on this instance follows those records. |
+| Audit rows | Never restored; audit history stays with the source workspace. The restored matter starts with a fresh audit trail here (a warning reports the excluded row count). |
+
+### Modes, folders and what restores
+
+A full archive restores documents with their retained original files re-attached and their stored SHA-256 metadata. A metadata-only archive restores documents with their recorded original metadata but without the file bytes. Both restore in the workspace the request was made in; other records (messages, reviews, tasks, comparisons, schedules, runs, operations, publications, jobs, comments, checkpoints, suggestions, skills, templates) restore as recorded above.
+
+### What is not restored
+
+- Workspace users, sessions, assistant keys and matter-access grants (records that reference users keep their IDs, as described above).
+- Model settings, connector credentials, integration key, notification channels.
+- Yjs collaboration history; draft bodies are restored as plain text.
+- Audit rows.
+- Original file bytes in a metadata-only archive.
+
 ## Security and non-goals
 
 The archive is not encrypted and not digitally signed. Checksums detect changes made without updating `SHA256SUMS`; they do not establish provenance, identity, approval or non-repudiation. A recipient who can replace both a payload and the checksum file can produce a self-consistent forged archive.
 
 Archives can contain confidential client material, source text, internal identifiers, audit records and client-portal recipient IDs. Store and transfer them under the matter's confidentiality rules and check the destination before downloading a full export.
 
-There is no import, restore, merge or migration command. Re-importing an archive is not supported. Use the SQLite backup and restore procedure in [OPERATIONS.md](OPERATIONS.md) for whole-workspace recovery.
+Restoring is subject to the collision and side-effect policies above: an archive restores as a new copy of a matter under this workspace's rules, and any identifiers that would overwrite existing records fail closed unless `newIds=1` is used. Use the SQLite backup and restore procedure in [OPERATIONS.md](OPERATIONS.md) for whole-workspace recovery, including workspace users and instance configuration.
 
 ## Test coverage
 
-`test/matter-archive.test.js` covers owner/editor export, viewer and anonymous denial, revocation, cross-matter isolation, metadata and full downloads, checksum verification, tamper rejection, independent metadata/original limits, referenced skills, orphaned-original omission, owner and editor audit behavior, audit truncation, empty-matter behavior and configured limits. `test/zip.test.js` covers round trips, stored entries, corruption, truncation, unsafe paths, case-insensitive duplicate detection, encryption rejection and symbolic-link rejection. The verifier is exercised against generated metadata, full and empty-matter archives. A headless Chromium download of the Documents export flow produced a metadata archive that the verifier accepted; this is a local browser check, not a cross-product comparison.
+`test/matter-archive.test.js` covers owner/editor export, viewer and anonymous denial, revocation, cross-matter isolation, metadata and full downloads, checksum verification, tamper rejection, independent metadata/original limits, referenced skills, orphaned-original omission, owner and editor audit behavior, audit truncation, empty-matter behavior and configured limits, plus the restore flow: role denial (editor, viewer, guest, anonymous), tampered and cross-matter archive rejection, a fresh restore of a full archive ending in the database and the workspace state (including re-attached original bytes), side-effect conversions (queued jobs to `failed`, schedules and watches disabled, final runs verbatim), collision handling (409 without `newIds`, remapped restore with `newIds=1` and internally consistent run/template/skill references). `test/zip.test.js` covers round trips, stored entries, corruption, truncation, unsafe paths, case-insensitive duplicate detection, encryption rejection and symbolic-link rejection. The verifier is exercised against generated metadata, full and empty-matter archives. A headless Chromium download of the Documents export flow produced a metadata archive that the verifier accepted; this is a local browser check, not a cross-product comparison.
 
 These are local behavioral tests. They do not establish legal accuracy, production security certification, cross-product export parity or that an archive is a complete representation of a matter.

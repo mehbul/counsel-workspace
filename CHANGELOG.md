@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Owner-only matter archive restore (`POST /api/matters/archive/restore`): the
+  offline verification pipeline runs before any write; identifier collisions
+  fail closed with `409` unless `newIds=1` requests a remap of every archived
+  record ID; side-effect state is explicitly converted (queued or running jobs
+  restore as `failed` and never run, workflow schedules and research watches
+  restore disabled, workflow runs without a final status restore as
+  `cancelled`, portal publications restore verbatim including revoked state,
+  audit rows are never restored); restored uploads are capped at 256 MiB; and
+  the response reports per-record counts plus one warning per policy decision.
+  The verifier is now a shared module (`matter-archive-verify.js`) reused by
+  the CLI (`npm run verify:archive`) and the restore path.
+
 ### Security
 
 - Resolved all open high-severity CodeQL findings: the model encryption key

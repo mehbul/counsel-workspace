@@ -169,7 +169,7 @@
                 "name": "Can I export my work?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "Yes. Owners and editors can export a matter as a ZIP with a manifest, SHA-256 checksums, readable source text, structured records and optional originals. Archives are checksummed, not encrypted or signed. There is no import or restore command yet."
+                  "text": "Yes. Owners and editors can export a matter as a ZIP with a manifest, SHA-256 checksums, readable source text, structured records and optional originals. Archives are checksummed, not encrypted or signed. A workspace owner can restore an archive as a new matter; imported jobs never run, schedules and research watches come back disabled and audit rows are not restored."
                 }
               },
               {
@@ -473,9 +473,10 @@
               audit subset and optional retained originals.
             </p>
             <p class="fine">
-              Checksummed, not encrypted or signed. There is no import or
-              restore command yet. This is a matter export, not a workspace
-              backup.
+              Checksummed, not encrypted or signed. Owners can restore an
+              archive as a new matter; restores never run jobs, re-enable
+              schedules or re-watch sources, and audit rows are not restored.
+              This is a matter export, not a workspace backup.
             </p>
             <a
               class="text-link"
@@ -617,8 +618,11 @@
                 <li>No OCR for scanned PDFs</li>
                 <li>No SSO, SCIM or MFA</li>
                 <li>No iManage or NetDocuments adapter</li>
-                <li>No archive import or restore</li>
                 <li>No archive encryption or signature</li>
+                <li>
+                  Archive restore is owner-only and follows the documented
+                  side-effect policy
+                </li>
                 <li>No multi-instance or high availability</li>
                 <li>No independent security or legal review</li>
                 <li>No guarantee of legal accuracy</li>
@@ -768,7 +772,9 @@ docker compose --env-file .env up -d --build</code></pre>
                 Yes. Owners and editors can export a matter as a ZIP with a
                 manifest, SHA-256 checksums, readable source text, structured
                 records and optional originals. Archives are checksummed, not
-                encrypted or signed. There is no import or restore command yet.
+                encrypted or signed. A workspace owner can restore an archive as
+                a new matter; imported jobs never run, schedules and research
+                watches come back disabled and audit rows are not restored.
               </p>
             </details>
             <details>

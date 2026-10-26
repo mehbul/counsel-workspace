@@ -42,6 +42,12 @@ accurate, or equivalent to a commercial product.
       `npm audit --omit=dev --audit-level=high` pass locally.
 - [x] Matter-archive verifier passes against generated metadata, full, and
       empty-matter archives.
+- [x] Owner-only archive restore passes local tests for role denial, tamper and
+      cross-matter rejection, fresh restore into the database and workspace
+      state, the side-effect policy (queued jobs to `failed` and never run,
+      schedules and watches disabled, non-terminal runs to `cancelled`) and
+      collision handling (`409` without `newIds`, remapped restore with
+      `newIds=1`).
 - [x] Headless browser download accepted by the verifier.
 - [x] GitHub CI passes on the public repository.
 - [x] CodeQL analysis completes without unresolved high-severity findings. All

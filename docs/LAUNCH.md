@@ -66,7 +66,9 @@ Docker Compose file and follow `docs/OPERATIONS.md`. Model generation is off by
 default; you can use local Ollama or configure a provider.
 
 Limits I want to be upfront about: no OCR, no SSO/MFA, no DMS permission sync,
-no archive restore, and no independent security audit. Please read
+and no independent security audit. Archive restore is owner-only and keeps the
+documented side-effect rules: restored jobs never run, schedules and watches
+come back disabled, audit rows are not restored. Please read
 `SECURITY.md` and `DISCLAIMER.md` before putting client material in it.
 
 I am looking for feedback from people who actually self-host legal or

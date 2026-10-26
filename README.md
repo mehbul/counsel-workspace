@@ -127,7 +127,7 @@ and retrieved passages and may charge for use. See
 | **Client portal**            | Separate guest accounts, explicit document and reviewed-text publication, selected recipients, matter grants, and immediate revocation.                                                                                           |
 | **Research**                 | US Federal Register and eCFR imports with official-origin pinning, bounded requests, matter-scoped publication watches, deduplicated alerts, and source provenance.                                                               |
 | **Notifications**            | Owner-only encrypted channels for signed webhooks, Slack, and Microsoft Teams; workflow and monitor events; durable retries and receipts.                                                                                         |
-| **Matter archives**          | Portable ZIP exports with `manifest.json`, `SHA256SUMS`, readable source text, structured records, a capped owner audit subset, and optional retained originals.                                                                  |
+| **Matter archives**          | Portable ZIP exports with `manifest.json`, `SHA256SUMS`, readable source text, structured records, a capped owner audit subset, optional retained originals, and an owner-only restore endpoint with an explicit no-side-effects policy. |
 | **Assistants**               | MCP tools for scoped evidence reading and host-authored drafts, review tables, and tasks, with expiring and revocable keys.                                                                                                       |
 | **Deployment**               | Personal mode, native team mode, Docker Compose, hardened-container checks, online backup, and restore guidance.                                                                                                                  |
 
@@ -161,9 +161,15 @@ npm run verify:archive -- path/to/counsel-matter.zip
 The verifier checks the ZIP structure and bounds, required files, checksum
 coverage, manifest sizes and hashes, counts, the matter ID, and the payload
 format. Archives are checksummed but **not encrypted, signed, or notarized**;
-they are portable matter exports, not encrypted workspace backups. There is no
-archive import or restore command. See
-[Matter archives](docs/MATTER-ARCHIVE.md).
+they are portable matter exports, not encrypted workspace backups.
+
+A workspace owner can restore an archive as a new matter with
+`POST /api/matters/archive/restore` (optionally `newIds=1`, which remaps all
+record IDs when identifiers collide). Restores never resume execution: imported
+jobs that were queued or running become `failed`, schedules and research watches
+import disabled, workflow runs without a final status import as `cancelled`, and
+former audit rows stay with the source workspace. Every one of these conversions
+is reported in the restore response. See [Matter archives](docs/MATTER-ARCHIVE.md).
 
 ## How it compares
 
@@ -190,7 +196,9 @@ it yourself, Counsel is for you.
 - No OCR. Scanned PDFs need external OCR first.
 - No SSO, SCIM, MFA, or enterprise directory integration.
 - No iManage or NetDocuments adapter, provider ACL sync, or ethical-wall mapping.
-- No archive import, restore, encryption, signature, or notarization.
+- No archive encryption, signature, or notarization. Restore is owner-only;
+  restores never run jobs, re-enable schedules or watches, and never include
+  audit rows.
 - No multi-instance or high-availability mode.
 - No independent security audit, penetration test, or legal review.
 - No guarantee of legal accuracy. The clause engine's document-disjoint CUAD

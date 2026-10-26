@@ -26,7 +26,8 @@ Version: 0.1.0, first public preview, 26 October 2026
 - [Legal evaluation](https://github.com/mehbul/counsel-workspace/blob/main/docs/LEGAL-EVALUATION.md):
   CUAD method, document-disjoint split and measured limits.
 - [Matter archives](https://github.com/mehbul/counsel-workspace/blob/main/docs/MATTER-ARCHIVE.md):
-  archive layout, access rules, checksums and the offline verifier.
+  archive layout, access rules, checksums, the offline verifier and the
+  owner-only restore policy.
 - [Assistant and MCP setup](https://github.com/mehbul/counsel-workspace/blob/main/docs/ASSISTANTS.md):
   stdio and HTTP MCP, scopes, connection files and client configuration.
 - [Product facts](https://mehbul.github.io/counsel-workspace/product.json):
@@ -60,6 +61,11 @@ Version: 0.1.0, first public preview, 26 October 2026
   Microsoft Teams, with durable retries and receipts.
 - Matter archives with a manifest, SHA-256SUMS, readable source text, structured
   records, an owner audit subset, optional originals and an offline verifier.
+- Owner-only archive restore: verification runs before any write, identifier
+  collisions fail closed unless `newIds=1` requests a remap, and restored
+  execution state never resumes (queued jobs restore as failed, schedules and
+  watches restore disabled, non-terminal runs restore as cancelled, audit rows
+  are not restored).
 - MCP integration for scoped evidence reading and host-authored drafts, reviews
   and tasks, with expiring and revocable keys.
 - Optional local Ollama, OpenAI-compatible, Anthropic and OpenAI generation.
@@ -71,7 +77,8 @@ Version: 0.1.0, first public preview, 26 October 2026
 - No OCR. Scanned PDFs need external OCR first.
 - No SSO, SCIM, MFA or enterprise directory integration.
 - No iManage or NetDocuments adapter, provider ACL sync or ethical-wall mapping.
-- No archive import, restore, encryption, signature or notarization.
+- No archive encryption, signature or notarization. Restore is owner-only and
+  documented with an explicit no-side-effects policy.
 - No multi-instance or high-availability mode.
 - No independent security audit, penetration test or legal review.
 - No guarantee of legal accuracy.

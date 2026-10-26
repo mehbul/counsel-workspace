@@ -36,6 +36,7 @@
     "US Federal Register research and eCFR imports with publication watches",
     "Signed webhook, Slack and Microsoft Teams notifications with durable receipts",
     "Checksummed matter archives with an offline verifier",
+    "Owner-only archive restore with fail-closed collision handling and an explicit no-side-effects policy",
     "MCP integration with expiring and revocable keys",
     "Optional local Ollama, OpenAI-compatible, Anthropic and OpenAI generation",
     "Docker Compose deployment, online backup and restore guidance"
@@ -57,8 +58,8 @@
     "No SSO, SCIM or MFA",
     "No iManage or NetDocuments adapter",
     "No provider ACL or ethical-wall synchronization",
-    "No archive import, restore or merge command",
     "No archive encryption, signature or notarization",
+    "Archive restore is owner-only and never resumes execution: jobs, schedules, watches and audit rows restore per the documented side-effect policy",
     "No multi-instance or high-availability mode",
     "No independent security audit or penetration test",
     "No independent legal review",

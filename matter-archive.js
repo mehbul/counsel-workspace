@@ -1,6 +1,8 @@
-const { createHash } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
+const multer = require("multer");
 const { context } = require("./security");
 const { buildZip, safeArchivePath } = require("./zip");
+const { inspectArchive } = require("./matter-archive-verify");
 
 const FORMAT = "counsel-matter-archive";
 const VERSION = 1;
@@ -8,6 +10,24 @@ const MAX_METADATA_BYTES = 128 * 1024 * 1024;
 const MAX_ORIGINAL_BYTES = 128 * 1024 * 1024;
 const MAX_ENTRIES = 4_000;
 const MAX_AUDIT_ROWS = 10_000;
+// Aligned with the export ceiling: a full archive can carry up to 128 MiB of
+// metadata plus 128 MiB of retained originals.
+const RESTORE_MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
+// Restore intake limits mirror the application's own record limits so a
+// restored matter behaves like the workspace it was exported from.
+const WORKSPACE_DOCUMENT_LIMIT = 1000;
+const RESTORE_LIMITS = {
+  matterName: 200,
+  client: 200,
+  description: 2000,
+  draftTitle: 500,
+  taskTitle: 500,
+  skillName: 200,
+  skillCategory: 100,
+  skillInstructions: 20000,
+  documentTextCharacters: 2_000_000,
+  reviewColumns: 12,
+};
 
 const fail = (status, message) => Object.assign(Error(message), { status });
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
@@ -55,6 +75,7 @@ function createMatterArchive(
   getContext = () => context.getStore(),
   options = {},
 ) {
+  const persist = typeof options.save === "function" ? options.save : null;
   const limits = {
     metadataBytes: options.maxMetadataBytes ?? MAX_METADATA_BYTES,
     originalBytes: options.maxOriginalBytes ?? MAX_ORIGINAL_BYTES,
@@ -627,7 +648,10 @@ function createMatterArchive(
       "This is a portable export of this matter's records and source text, not a full workspace backup.",
       "Workspace users, model settings, connector credentials, notification channels and Yjs collaboration",
       "history are not included. Workflow runs retain their step snapshots; workflow templates are the",
-      "current definitions. There is no import or restore command. Draft bodies are exported as plain text.",
+      "current definitions. Restore is owner-only: POST this archive to /api/matters/archive/restore on a",
+      "workspace (optionally with the newIds field, which restores the matter under fresh identifiers when",
+      "identifiers collide). Restored jobs never run, schedules and research watches restore disabled, and",
+      "audit rows stay with the source workspace. Draft bodies are exported and restored as plain text.",
       "",
       "Verification",
       "------------",
@@ -829,6 +853,739 @@ function createMatterArchive(
       warnings: result.warnings,
     };
   }
+
+  // ---------------------------------------------------------------
+  // Restore
+  // ---------------------------------------------------------------
+
+  function plainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function requireText(value, label, limit) {
+    if (typeof value !== "string" || !value.length)
+      throw fail(400, `The archived ${label} is invalid.`);
+    if (limit !== undefined && value.length > limit)
+      throw fail(
+        400,
+        `The archived ${label} exceeds the ${limit}-character record limit.`,
+      );
+    return value;
+  }
+
+  function requireCreated(value, label) {
+    if (typeof value !== "string" || Number.isNaN(Date.parse(value)))
+      throw fail(400, `The archived ${label} timestamp is invalid.`);
+    return value;
+  }
+
+  function requireMatterRef(value, label, matterId) {
+    if (value !== matterId)
+      throw fail(
+        400,
+        `The archived ${label} does not belong to the archived matter. The archive is not restorable.`,
+      );
+    return value;
+  }
+
+  function requireMatchingDraft(value, label, draftIds) {
+    if (!draftIds.has(value))
+      throw fail(
+        400,
+        `The archived ${label} references a draft that is not part of the archive. The archive is not restorable.`,
+      );
+    return value;
+  }
+
+  function restore(buffer, settings = {}) {
+    const c = getContext();
+    if (!c) throw fail(500, "Workspace context is unavailable.");
+    if (c.role !== "owner")
+      throw fail(
+        403,
+        "Workspace owner access is required to restore a matter archive.",
+      );
+    if (!persist) throw fail(500, "Restore persistence is not configured.");
+    if (!Buffer.isBuffer(buffer) || !buffer.length)
+      throw fail(400, "Send the archive ZIP in the archive field.");
+    let parsed;
+    try {
+      parsed = inspectArchive(buffer);
+    } catch (error) {
+      throw fail(400, `Archive verification failed: ${error.message}`);
+    }
+    const {
+        files,
+        manifest,
+        matter,
+        documentIds,
+        draftIds,
+        documents,
+        drafts,
+        skills,
+        originals,
+        audit,
+        messages,
+        reviews,
+        tasks,
+        comparisons,
+        watches,
+        runs,
+        schedules,
+        templates,
+        operations,
+        publications,
+        jobs,
+        comments,
+        checkpoints,
+        suggestions,
+      } = parsed,
+      matterId = requireText(matter.id, "matter identifier"),
+      warnings = [],
+      counts = {};
+
+    // Structural validation. The verifier established integrity (sizes and
+    // checksums); these calls establish that every record can be stored
+    // safely on this instance and belongs to the archived matter only.
+    requireCreated(matter.created, "matter");
+    requireText(matter.name, "matter name", RESTORE_LIMITS.matterName);
+    if (matter.client !== undefined)
+      requireText(matter.client || "", "matter client", RESTORE_LIMITS.client);
+    if (matter.description !== undefined)
+      requireText(
+        matter.description || "",
+        "matter description",
+        RESTORE_LIMITS.description,
+      );
+    for (const document of documents) {
+      requireMatterRef(document.matterId, "document", matterId);
+      requireText(document.name, "document name");
+      requireCreated(document.created, "document");
+      const source = files.get(document.archive.textPath).data.toString("utf8");
+      if (source.length > RESTORE_LIMITS.documentTextCharacters)
+        throw fail(
+          400,
+          `An archived document exceeds the ${RESTORE_LIMITS.documentTextCharacters}-character record limit.`,
+        );
+    }
+    for (const message of messages) {
+      requireMatterRef(message.matterId, "message", matterId);
+      requireText(message.query, "message query");
+      requireCreated(message.created, "message");
+    }
+    for (const review of reviews) {
+      requireMatterRef(review.matterId, "review", matterId);
+      requireText(review.name, "review name");
+      requireCreated(review.created, "review");
+      if (
+        !Array.isArray(review.columns) ||
+        review.columns.length < 1 ||
+        review.columns.length > RESTORE_LIMITS.reviewColumns ||
+        review.columns.some((column) => typeof column !== "string")
+      )
+        throw fail(400, "The archived review columns are invalid.");
+      for (const cell of review.cells || [])
+        if (!documentIds.has(cell?.documentId))
+          throw fail(
+            400,
+            "An archived review cell references a document that is not part of the archive. The archive is not restorable.",
+          );
+    }
+    for (const draft of drafts) {
+      requireMatterRef(draft.matterId, "draft", matterId);
+      requireText(draft.title, "draft title", RESTORE_LIMITS.draftTitle);
+      requireCreated(draft.created, "draft");
+    }
+    for (const task of tasks) {
+      requireMatterRef(task.matterId, "task", matterId);
+      requireText(task.title, "task title", RESTORE_LIMITS.taskTitle);
+    }
+    for (const skill of skills) {
+      requireText(skill.name, "skill name", RESTORE_LIMITS.skillName);
+      const category = skill.category || "Custom";
+      if (
+        typeof category !== "string" ||
+        category.length > RESTORE_LIMITS.skillCategory
+      )
+        throw fail(400, "The archived skill category is invalid.");
+      requireText(
+        skill.instructions,
+        "skill instructions",
+        RESTORE_LIMITS.skillInstructions,
+      );
+    }
+    for (const comparison of comparisons) {
+      if (!plainObject(comparison.report))
+        throw fail(400, "The archived comparison report is invalid.");
+      requireCreated(comparison.created, "comparison");
+    }
+    for (const watch of watches) {
+      if (
+        !plainObject(watch.watch) ||
+        !Number.isInteger(watch.nextScan) ||
+        typeof watch.actorId !== "string" ||
+        !watch.actorId
+      )
+        throw fail(400, "The archived research watch is invalid.");
+    }
+    for (const run of runs) {
+      if (
+        !plainObject(run.run) ||
+        typeof run.storedStatus !== "string" ||
+        typeof run.actorId !== "string" ||
+        !run.actorId
+      )
+        throw fail(400, "The archived workflow run is invalid.");
+    }
+    for (const schedule of schedules) {
+      if (
+        !Number.isInteger(schedule.intervalMinutes) ||
+        schedule.intervalMinutes < 1 ||
+        !Number.isInteger(schedule.nextAt) ||
+        typeof schedule.actorId !== "string" ||
+        !schedule.actorId
+      )
+        throw fail(400, "The archived workflow schedule is invalid.");
+    }
+    for (const template of templates) {
+      if (
+        !plainObject(template.definition) ||
+        !Number.isInteger(template.version) ||
+        template.version < 1
+      )
+        throw fail(400, "The archived workflow template is invalid.");
+      requireCreated(template.updated, "template");
+    }
+    for (const operation of operations) {
+      if (typeof operation.kind !== "string" || !plainObject(operation.record))
+        throw fail(400, "The archived legal operation is invalid.");
+    }
+    for (const publication of publications) {
+      requireText(publication.title, "portal publication title");
+      requireText(publication.content, "portal publication content");
+      if (
+        typeof publication.kind !== "string" ||
+        typeof publication.publisher !== "string" ||
+        !publication.publisher ||
+        !Array.isArray(publication.recipients) ||
+        typeof publication.revoked !== "boolean"
+      )
+        throw fail(400, "The archived portal publication is invalid.");
+      requireCreated(publication.created, "portal publication");
+    }
+    for (const job of jobs) {
+      if (
+        typeof job.kind !== "string" ||
+        typeof job.userId !== "string" ||
+        !job.userId
+      )
+        throw fail(400, "The archived job record is invalid.");
+      if (!["queued", "running", "completed", "failed"].includes(job.status))
+        throw fail(400, "The archived job record is invalid.");
+    }
+    for (const comment of comments) {
+      requireMatchingDraft(comment.draftId, "draft comment", draftIds);
+      if (
+        typeof comment.author !== "string" ||
+        !comment.author ||
+        typeof comment.body !== "string" ||
+        !comment.body
+      )
+        throw fail(400, "The archived draft comment is invalid.");
+    }
+    for (const checkpoint of checkpoints) {
+      requireMatchingDraft(checkpoint.draftId, "draft checkpoint", draftIds);
+      if (
+        typeof checkpoint.author !== "string" ||
+        !checkpoint.author ||
+        typeof checkpoint.name !== "string" ||
+        !checkpoint.name ||
+        typeof checkpoint.content !== "string"
+      )
+        throw fail(400, "The archived draft checkpoint is invalid.");
+    }
+    for (const suggestion of suggestions) {
+      requireMatchingDraft(suggestion.draftId, "draft suggestion", draftIds);
+      if (!plainObject(suggestion.suggestion))
+        throw fail(400, "The archived draft suggestion is invalid.");
+    }
+
+    // Collision policy: any identifier already present on this instance is a
+    // conflict. Without the newIds flag the restore fails closed; with it,
+    // every archived identifier is remapped to a fresh one so nothing is ever
+    // overwritten silently.
+    const conflicts = [];
+    function conflict(kind, count) {
+      if (count) conflicts.push({ kind, count });
+    }
+    const tableIds = (table) =>
+      hasTable(table)
+        ? new Set(
+            db
+              .prepare(`SELECT id FROM ${table} WHERE id IS NOT NULL`)
+              .all()
+              .map((row) => row.id),
+          )
+        : new Set();
+    const stateIds = (collection) =>
+      new Set((c.fullState[collection] || []).map((item) => item.id));
+    const existingSkills = new Set(
+      (c.fullState.skills || []).map((skill) => skill.id),
+    );
+    const existingTables = {
+      comparisons: tableIds("document_comparisons"),
+      watches: tableIds("research_watches"),
+      runs: tableIds("workflow_runs"),
+      schedules: tableIds("workflow_schedules"),
+      templates: tableIds("workflow_templates"),
+      operations: tableIds("legal_operations"),
+      publications: tableIds("portal_publications"),
+      jobs: tableIds("jobs"),
+      comments: tableIds("draft_comments"),
+      checkpoints: tableIds("draft_checkpoints"),
+      suggestions: tableIds("draft_suggestions"),
+    };
+    const existingState = {
+      documents: stateIds("documents"),
+      messages: stateIds("messages"),
+      reviews: stateIds("reviews"),
+      drafts: stateIds("drafts"),
+      tasks: stateIds("tasks"),
+    };
+    if (c.fullState.matters.some((m) => m.id === matterId))
+      conflict("matter records", 1);
+    conflict(
+      "documents",
+      documents.filter((d) => existingState.documents.has(d.id)).length,
+    );
+    conflict(
+      "messages",
+      messages.filter((m) => existingState.messages.has(m.id)).length,
+    );
+    conflict(
+      "reviews",
+      reviews.filter((r) => existingState.reviews.has(r.id)).length,
+    );
+    conflict(
+      "drafts",
+      drafts.filter((d) => existingState.drafts.has(d.id)).length,
+    );
+    conflict(
+      "tasks",
+      tasks.filter((t) => existingState.tasks.has(t.id)).length,
+    );
+    conflict("skills", skills.filter((s) => existingSkills.has(s.id)).length);
+    conflict(
+      "comparisons",
+      comparisons.filter((r) => existingTables.comparisons.has(r.id)).length,
+    );
+    conflict(
+      "research watches",
+      watches.filter((r) => existingTables.watches.has(r.id)).length,
+    );
+    conflict(
+      "workflow runs",
+      runs.filter((r) => existingTables.runs.has(r.id)).length,
+    );
+    conflict(
+      "workflow schedules",
+      schedules.filter((r) => existingTables.schedules.has(r.id)).length,
+    );
+    conflict(
+      "workflow templates",
+      templates.filter((r) => existingTables.templates.has(r.id)).length,
+    );
+    conflict(
+      "legal operations",
+      operations.filter((r) => existingTables.operations.has(r.id)).length,
+    );
+    conflict(
+      "portal publications",
+      publications.filter((r) => existingTables.publications.has(r.id)).length,
+    );
+    conflict("jobs", jobs.filter((r) => existingTables.jobs.has(r.id)).length);
+    conflict(
+      "draft comments",
+      comments.filter((r) => existingTables.comments.has(r.id)).length,
+    );
+    conflict(
+      "draft checkpoints",
+      checkpoints.filter((r) => existingTables.checkpoints.has(r.id)).length,
+    );
+    conflict(
+      "draft suggestions",
+      suggestions.filter((r) => existingTables.suggestions.has(r.id)).length,
+    );
+    const remap = new Map();
+    if (conflicts.length) {
+      const summary = conflicts
+          .map((entry) => `${entry.count} ${entry.kind}`)
+          .join(", "),
+        message =
+          `Restore would overwrite existing workspace records: ${summary}. ` +
+          "Re-submit the request with newIds=1 to restore the matter under fresh identifiers.";
+      if (!settings.newIds) throw fail(409, message);
+      warnings.push(
+        `${conflicts.length} archived record type(s) collided with existing records: ${summary}. The matter was restored under fresh identifiers.`,
+      );
+      const collected = [];
+      for (const record of [
+        matter,
+        ...documents,
+        ...messages,
+        ...reviews,
+        ...drafts,
+        ...tasks,
+        ...skills,
+        ...comparisons,
+        ...watches,
+        ...runs,
+        ...schedules,
+        ...templates,
+        ...operations,
+        ...publications,
+        ...jobs,
+        ...comments,
+        ...checkpoints,
+        ...suggestions,
+      ])
+        if (record?.id) collected.push(record.id);
+      for (const id of new Set(collected)) remap.set(id, randomUUID());
+    }
+    function remapIds(value) {
+      if (Array.isArray(value)) return value.map(remapIds);
+      if (plainObject(value)) {
+        const out = {};
+        for (const [key, item] of Object.entries(value))
+          if (key !== "archive") out[key] = remapIds(item);
+        return out;
+      }
+      if (typeof value === "string") return remap.get(value) ?? value;
+      return value;
+    }
+    const mapped = remapIds;
+    const newMatterId = mapped(matterId);
+    const sourceText = (item) =>
+      files.get(item.archive.textPath).data.toString("utf8");
+
+    // Side-effect policy. Restored records never resume execution on this
+    // instance; every conversion is reported to the caller.
+    const pendingJobs = jobs.filter(
+      (job) => job.status === "queued" || job.status === "running",
+    );
+    if (pendingJobs.length)
+      warnings.push(
+        `${pendingJobs.length} queued or running job record(s) were restored as failed; execution state never carries over between instances.`,
+      );
+    const jobRecords = jobs.map((job) => {
+      const converted = job.status === "queued" || job.status === "running";
+      return {
+        id: job.id,
+        userId: job.userId,
+        kind: job.kind,
+        payload: JSON.stringify(mapped(job.payload)),
+        status: converted ? "failed" : job.status,
+        result:
+          job.result === null || job.result === undefined
+            ? null
+            : JSON.stringify(job.result),
+        error: converted
+          ? "Restored from a matter archive; this job was queued on the source instance and was not executed here."
+          : job.error,
+        created: job.created,
+        updated: job.updated,
+      };
+    });
+    const terminal = ["completed", "cancelled", "failed"];
+    const pausedRuns = runs.filter(
+      (run) => !terminal.includes(run.storedStatus),
+    );
+    if (pausedRuns.length)
+      warnings.push(
+        `${pausedRuns.length} workflow run(s) without a final status were restored as cancelled.`,
+      );
+    const runRecords = runs.map((run) => ({
+      id: run.id,
+      actorId: run.actorId,
+      templateId: run.templateId,
+      data: JSON.stringify(mapped(run.run)),
+      status: terminal.includes(run.storedStatus)
+        ? run.storedStatus
+        : "cancelled",
+      created: run.created,
+    }));
+    if (schedules.length)
+      warnings.push(
+        `${schedules.length} workflow schedule(s) were restored disabled; enable each one after reviewing its interval.`,
+      );
+    const scheduleRecords = schedules.map((schedule) => ({
+      id: schedule.id,
+      actorId: schedule.actorId,
+      templateId: schedule.templateId,
+      input: JSON.stringify(mapped(schedule.input)),
+      intervalMinutes: schedule.intervalMinutes,
+      nextAt: schedule.nextAt,
+      lastRunId: schedule.lastRunId ? mapped(schedule.lastRunId) : null,
+      lastError: schedule.lastError,
+      created: schedule.created,
+    }));
+    if (watches.length)
+      warnings.push(
+        `${watches.length} research watch(es) were restored disabled because watch scans perform live queries against public legal sources.`,
+      );
+    const watchRecords = watches.map((watch) => ({
+      id: watch.id,
+      actorId: watch.actorId,
+      data: JSON.stringify(mapped(watch.watch)),
+      nextScan: watch.nextScan,
+    }));
+    if (publications.length)
+      warnings.push(
+        `${publications.length} client portal publication(s) were restored as recorded, including revoked state; portal visibility follows those records on this instance.`,
+      );
+    if (documents.length || drafts.length)
+      warnings.push(
+        `Documents and drafts are restored as plain text from the archive${
+          manifest.originalsIncluded
+            ? `, together with ${originals.retained.length} re-attached original file(s)`
+            : "; original source files are not part of a metadata-only archive, so restored documents keep their recorded original metadata without the file contents"
+        }. Rich formatting and collaboration history are not part of the archive format.`,
+      );
+    if (audit.available)
+      warnings.push(
+        `${audit.rows.length} archived audit row(s) were not restored; audit history stays with the source workspace.`,
+      );
+    else
+      warnings.push(
+        "The archive does not include audit rows; the restored matter starts without audit history on this instance.",
+      );
+    if (
+      (c.fullState.documents || []).length + documents.length >
+      WORKSPACE_DOCUMENT_LIMIT
+    )
+      throw fail(
+        409,
+        `Restoring this archive would exceed the workspace document limit of ${WORKSPACE_DOCUMENT_LIMIT}. Remove documents or restore into a fresh workspace.`,
+      );
+
+    // Write everything. The workspace mutation queue serializes this request,
+    // so the collision checks above cannot race other writers.
+    for (const comparison of comparisons)
+      db.prepare("INSERT INTO document_comparisons VALUES(?,?,?,?,?)").run(
+        mapped(comparison.id),
+        c.workspaceId,
+        newMatterId,
+        JSON.stringify(comparison.report),
+        comparison.created,
+      );
+    for (const template of templates)
+      db.prepare("INSERT INTO workflow_templates VALUES(?,?,?,?,?)").run(
+        mapped(template.id),
+        c.workspaceId,
+        JSON.stringify(mapped(template.definition)),
+        template.version,
+        template.updated,
+      );
+    for (const run of runRecords)
+      db.prepare("INSERT INTO workflow_runs VALUES(?,?,?,?,?,?,?,?)").run(
+        mapped(run.id),
+        c.workspaceId,
+        mapped(run.actorId),
+        newMatterId,
+        mapped(run.templateId),
+        run.data,
+        run.status,
+        run.created,
+      );
+    for (const schedule of scheduleRecords)
+      db.prepare(
+        "INSERT INTO workflow_schedules VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+      ).run(
+        mapped(schedule.id),
+        c.workspaceId,
+        mapped(schedule.actorId),
+        newMatterId,
+        mapped(schedule.templateId),
+        schedule.input,
+        schedule.intervalMinutes,
+        schedule.nextAt,
+        0,
+        schedule.lastRunId,
+        schedule.lastError,
+        schedule.created,
+      );
+    for (const operation of operations)
+      db.prepare("INSERT INTO legal_operations VALUES(?,?,?,?,?)").run(
+        mapped(operation.id),
+        c.workspaceId,
+        newMatterId,
+        operation.kind,
+        JSON.stringify(operation.record),
+      );
+    for (const publication of publications)
+      db.prepare(
+        "INSERT INTO portal_publications VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+      ).run(
+        mapped(publication.id),
+        c.workspaceId,
+        newMatterId,
+        publication.title,
+        publication.kind,
+        mapped(publication.documentId),
+        publication.sourceHash,
+        publication.content,
+        JSON.stringify(publication.recipients),
+        publication.created,
+        publication.publisher,
+        publication.revoked ? 1 : 0,
+      );
+    for (const job of jobRecords)
+      db.prepare("INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(
+        mapped(job.id),
+        c.workspaceId,
+        mapped(job.userId),
+        newMatterId,
+        job.kind,
+        job.payload,
+        job.status,
+        job.result,
+        job.error,
+        job.created,
+        job.updated,
+      );
+    for (const comment of comments)
+      db.prepare("INSERT INTO draft_comments VALUES(?,?,?,?,?,?,?)").run(
+        mapped(comment.id),
+        c.workspaceId,
+        mapped(comment.draftId),
+        comment.author,
+        comment.body,
+        comment.resolved ? 1 : 0,
+        comment.created,
+      );
+    for (const checkpoint of checkpoints)
+      db.prepare("INSERT INTO draft_checkpoints VALUES(?,?,?,?,?,?,?)").run(
+        mapped(checkpoint.id),
+        c.workspaceId,
+        mapped(checkpoint.draftId),
+        checkpoint.author,
+        checkpoint.name,
+        checkpoint.content,
+        checkpoint.created,
+      );
+    for (const suggestion of suggestions)
+      db.prepare("INSERT INTO draft_suggestions VALUES(?,?,?,?)").run(
+        mapped(suggestion.id),
+        c.workspaceId,
+        mapped(suggestion.draftId),
+        JSON.stringify(suggestion.suggestion),
+      );
+    for (const watch of watchRecords)
+      db.prepare("INSERT INTO research_watches VALUES(?,?,?,?,?,?,?)").run(
+        mapped(watch.id),
+        c.workspaceId,
+        watch.actorId,
+        newMatterId,
+        watch.data,
+        watch.nextScan,
+        0,
+      );
+    if (manifest.originalsIncluded)
+      for (const original of originals.retained) {
+        const bytes = files.get(original.path).data;
+        if (
+          bytes.length !== original.bytes ||
+          sha256(bytes) !== original.sha256
+        )
+          throw fail(
+            409,
+            "A retained original failed its integrity check. The matter was not restored.",
+          );
+        db.prepare("INSERT INTO document_originals VALUES(?,?,?,?,?,?,?)").run(
+          c.workspaceId,
+          mapped(original.documentId),
+          newMatterId,
+          original.name,
+          original.mime,
+          original.sha256,
+          bytes,
+        );
+      }
+
+    // State-blob collections. Text lives here, not in separate tables.
+    c.state.matters ||= [];
+    c.state.documents ||= [];
+    c.state.messages ||= [];
+    c.state.reviews ||= [];
+    c.state.drafts ||= [];
+    c.state.tasks ||= [];
+    c.state.skills ||= [];
+    c.state.activity ||= [];
+    c.state.matters.push({ ...mapped(matter) });
+    c.state.skills.push(...skills.map((skill) => ({ ...mapped(skill) })));
+    c.state.documents.push(
+      ...documents.map((document) => ({
+        ...mapped(document),
+        text: sourceText(document),
+      })),
+    );
+    c.state.messages.push(...messages.map((message) => mapped(message)));
+    c.state.reviews.push(...reviews.map((review) => mapped(review)));
+    c.state.drafts.push(
+      ...drafts.map((draft) => ({
+        ...mapped(draft),
+        content: sourceText(draft),
+      })),
+    );
+    c.state.tasks.push(...tasks.map((task) => mapped(task)));
+    c.state.activity = [
+      {
+        id: randomUUID(),
+        action: `Restored matter: ${matter.name}`,
+        date: new Date().toISOString(),
+      },
+      ...c.state.activity,
+    ].slice(0, 100);
+    c.audit(c.workspaceId, c.actor, "matter.archive.restored", newMatterId);
+    persist();
+
+    counts.documents = documents.length;
+    counts.messages = messages.length;
+    counts.reviews = reviews.length;
+    counts.drafts = drafts.length;
+    counts.tasks = tasks.length;
+    counts.skills = skills.length;
+    counts.comparisons = comparisons.length;
+    counts.researchWatches = watchRecords.length;
+    counts.workflowRuns = runRecords.length;
+    counts.workflowRunsCancelled = pausedRuns.length;
+    counts.workflowSchedules = scheduleRecords.length;
+    counts.workflowTemplates = templates.length;
+    counts.legalOperations = operations.length;
+    counts.portalPublications = publications.length;
+    counts.jobs = jobs.length;
+    counts.jobsRestoredAsFailed = pendingJobs.length;
+    counts.draftComments = comments.length;
+    counts.draftCheckpoints = checkpoints.length;
+    counts.draftSuggestions = suggestions.length;
+    counts.originals = manifest.originalsIncluded
+      ? originals.retained.length
+      : 0;
+    counts.auditRowsNotRestored = audit.available ? audit.rows.length : 0;
+    return {
+      matter: {
+        id: newMatterId,
+        name: matter.name,
+        client: matter.client || "",
+      },
+      mode: manifest.mode,
+      counts,
+      warnings: warnings.filter(
+        (warning, index, all) => all.indexOf(warning) === index,
+      ),
+    };
+  }
+
   function reply(res, error) {
     if (error?.status) {
       res.status(error.status).json({ error: error.message });
@@ -837,6 +1594,49 @@ function createMatterArchive(
     return false;
   }
   function install(app) {
+    const restoreUpload = multer({
+      storage: multer.memoryStorage(),
+      limits: {
+        fileSize: RESTORE_MAX_ARCHIVE_BYTES,
+        files: 1,
+        fields: 2,
+        fieldSize: 256,
+      },
+    });
+    app.post(
+      "/api/matters/archive/restore",
+      (req, res, next) => {
+        restoreUpload.single("archive")(req, res, (error) => {
+          if (error instanceof multer.MulterError)
+            return res
+              .status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400)
+              .json({
+                error:
+                  error.code === "LIMIT_FILE_SIZE"
+                    ? `The archive exceeds the ${mib(RESTORE_MAX_ARCHIVE_BYTES)} restore limit.`
+                    : "Send the archive ZIP in the archive field.",
+              });
+          if (error) return next(error);
+          if (!req.file || !req.file.buffer?.length)
+            return res
+              .status(400)
+              .json({ error: "Send the archive ZIP in the archive field." });
+          next();
+        });
+      },
+      (req, res, next) => {
+        try {
+          const flag = String(req.body?.newIds ?? "").toLowerCase();
+          const result = restore(req.file.buffer, {
+            newIds: flag === "1" || flag === "true",
+          });
+          res.set("Cache-Control", "no-store");
+          res.json(result);
+        } catch (error) {
+          if (!reply(res, error)) next(error);
+        }
+      },
+    );
     app.get("/api/matters/:id/archive/preview", (req, res, next) => {
       try {
         res.set("Cache-Control", "no-store");
@@ -873,7 +1673,7 @@ function createMatterArchive(
       }
     });
   }
-  return { build, install, preview };
+  return { build, install, preview, restore };
 }
 
 function matterName(value) {
@@ -886,6 +1686,7 @@ module.exports = {
   MAX_ENTRIES,
   MAX_METADATA_BYTES,
   MAX_ORIGINAL_BYTES,
+  RESTORE_MAX_ARCHIVE_BYTES,
   VERSION,
   createMatterArchive,
   safeName,

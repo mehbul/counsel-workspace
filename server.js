@@ -229,7 +229,11 @@ const research = require("./research").installResearch(
     notify: notifications.notify,
   },
 );
-const matterArchive = require("./matter-archive").createMatterArchive(db);
+const matterArchive = require("./matter-archive").createMatterArchive(
+  db,
+  () => context.getStore(),
+  { save },
+);
 matterArchive.install(app);
 for (const [route, collection, field] of [
   ["messages", "messages", "text"],
