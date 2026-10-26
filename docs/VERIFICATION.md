@@ -2,7 +2,7 @@
 
 Repository: https://github.com/mehbul/counsel-workspace (private).
 
-Code commit `a2a2eb7` passed [GitHub CI run 39908710638](https://github.com/mehbul/counsel-workspace/actions/runs/39908710638) on 23 October 2026. The same 18 tests passed locally. The frontend bundle build, formatting checks and dependency vulnerability audit passed. The staged-file check found no runtime databases, private keys or recognized access-token patterns; this is a bounded check, not an independent security audit.
+Code commit `491be71` passed [GitHub CI run 40299010215](https://github.com/mehbul/counsel-workspace/actions/runs/40299010215) on 26 October 2026. The same 185 tests passed locally. The frontend bundle build, formatting checks, dependency vulnerability audit, Docker image build and hardened-container smoke test passed. Repository scans found no tracked runtime databases, private keys or recognized access-token patterns; this is a bounded check, not an independent security audit.
 
 ## Verified behavior
 
@@ -21,6 +21,6 @@ Code commit `a2a2eb7` passed [GitHub CI run 39908710638](https://github.com/mehb
 
 These checks do not establish full Legora parity, legal advice accuracy, independent security certification, or superiority over Legora. There has been no matched benchmark against its authenticated product.
 
-Live enterprise provider consent, permission semantics and writeback need approved test tenants and credentials. Snapshot connectors do not mirror provider ACLs or source deletions. Collaboration is plain-text; rich formatting, Word tracked changes and comments are absent. Licensed legal research, OCR, SSO/MFA, Office add-ins, full DMS synchronization, monitoring and client portals remain separate workstreams. Public HTTPS deployment, realistic load, disaster-recovery drills and independent review remain release gates.
+Live enterprise provider consent, permission semantics and writeback need approved test tenants and credentials. Snapshot connectors do not mirror provider ACLs or source deletions. Rich-text collaboration, comments, checkpoints, DOCX revision export and an Office task-pane bridge are implemented, but full in-place Word tracked-change interoperability, tenant-installed Word/Outlook add-ins and anchored comments remain open. Licensed legal research, OCR, SSO/MFA, comprehensive external monitoring feeds, external notifications and full DMS synchronization are still missing. Public HTTPS deployment, realistic load, disaster-recovery drills and independent security and legal-domain review remain release gates.
 
 The default improvement priorities are privacy, reliability and verifiable evidence. Any claim of being better should be based on a defined task corpus, blinded legal review, citation correctness, failure behavior, latency, cost and operational reliability—not a feature checklist or screenshots alone.
