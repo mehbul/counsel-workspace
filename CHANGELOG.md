@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Security
+
+- Resolved all open high-severity CodeQL findings: the model encryption key
+  and evaluation outputs are now created through exclusive `openSync("wx")`
+  file descriptors instead of an existence check followed by a write; Google
+  Drive folder identifiers are allowlisted instead of quote-escaped; and eCFR
+  text sanitization removes tags to a fixed point and strips remaining angle
+  brackets so no markup can survive.
+- CodeQL now analyzes production code and skips the `test` directory, whose
+  local fixture/loopback scaffolding generated recurring false positives.
+- Remaining CodeQL findings in the MCP connection tools and the optional local
+  smoke scripts were triaged and dismissed with written justifications.
+
 ## [0.1.0] - 2026-10-26
 
 First public preview. This is a functional, self-hosted foundation, not a

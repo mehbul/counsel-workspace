@@ -120,9 +120,19 @@ function createModelSettings(app, db, security, options = {}) {
     options.dataDir || env.DATA_DIR || path.join(__dirname, "data");
   fs.mkdirSync(directory, { recursive: true });
   const keyPath = path.join(directory, "model-key");
-  if (!fs.existsSync(keyPath))
-    fs.writeFileSync(keyPath, randomBytes(32), { flag: "wx", mode: 0o600 });
-  const key = fs.readFileSync(keyPath);
+  let key;
+  try {
+    const descriptor = fs.openSync(keyPath, "wx", 0o600);
+    try {
+      key = randomBytes(32);
+      fs.writeFileSync(descriptor, key);
+    } finally {
+      fs.closeSync(descriptor);
+    }
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    key = fs.readFileSync(keyPath);
+  }
   if (key.length !== 32) throw Error("Invalid model encryption key");
   db.exec(
     "CREATE TABLE IF NOT EXISTS model_settings(workspace_id TEXT PRIMARY KEY, config TEXT NOT NULL)",

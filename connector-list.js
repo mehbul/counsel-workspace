@@ -1,5 +1,11 @@
 const GRAPH = "https://graph.microsoft.com",
-  GOOGLE = "https://www.googleapis.com";
+  GOOGLE = "https://www.googleapis.com",
+  DRIVE_ID = /^[A-Za-z0-9_-]{1,200}$/;
+function googleFolderId(value) {
+  if (typeof value !== "string" || !DRIVE_ID.test(value))
+    throw Error("Invalid Google Drive folder identifier");
+  return value;
+}
 async function collectFiles(config, read) {
   const queue = [config.folderId],
     folders = new Set(),
@@ -38,7 +44,7 @@ async function collectFiles(config, read) {
           throw Error("Invalid provider continuation URL");
       } else {
         const params = new URLSearchParams({
-          q: `'${folder.replace(/'/g, "\\'")}' in parents and trashed = false`,
+          q: `'${googleFolderId(folder)}' in parents and trashed = false`,
           fields: "nextPageToken,files(id,name,modifiedTime,size,mimeType)",
           pageSize: "200",
           supportsAllDrives: "true",

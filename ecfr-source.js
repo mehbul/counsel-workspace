@@ -9,8 +9,7 @@ const validSection = (value) =>
 const validTitle = (value) =>
   Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 50;
 function plain(value) {
-  return String(value || "")
-    .replace(/<[^>]*>/g, "")
+  let text = String(value || "")
     .replace(/&#(x[0-9a-f]+|\d+);/gi, (_, n) => {
       const code =
         n[0].toLowerCase() === "x" ? parseInt(n.slice(1), 16) : Number(n);
@@ -21,6 +20,12 @@ function plain(value) {
       (_, name) =>
         ({ lt: "<", gt: ">", amp: "&", quot: '"', apos: "'", nbsp: " " })[name],
     );
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<[^>]*>/g, "");
+  } while (text !== previous);
+  return text.replace(/[<>]/g, "");
 }
 async function titleDates(options) {
   const data = await readSource(

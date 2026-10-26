@@ -5,6 +5,22 @@ const { readSuite, readJsonl, jsonl } = require("../evaluation/suite");
 const { evaluatePredictions } = require("../evaluation/scorer");
 const { retrievalPredictions } = require("../evaluation/retrieval");
 
+function writeNewFile(file, data) {
+  let descriptor;
+  try {
+    descriptor = fs.openSync(file, "wx", 0o600);
+  } catch (error) {
+    if (error.code === "EEXIST")
+      throw Error("Output already exists; use a new evaluation run name.");
+    throw error;
+  }
+  try {
+    fs.writeFileSync(descriptor, data);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
 function main() {
   const { values } = parseArgs({
     options: {
@@ -56,14 +72,8 @@ function main() {
         };
   fs.mkdirSync(path.dirname(output), { recursive: true });
   if (values.mode === "retrieval")
-    fs.writeFileSync(predictionsFile, jsonl(predictions), {
-      flag: "wx",
-      mode: 0o600,
-    });
-  fs.writeFileSync(output, JSON.stringify(report, null, 2) + "\n", {
-    flag: "wx",
-    mode: 0o600,
-  });
+    writeNewFile(predictionsFile, jsonl(predictions));
+  writeNewFile(output, JSON.stringify(report, null, 2) + "\n");
   const { results, dataset, ...summary } = report;
   console.log(JSON.stringify({ output, ...summary }, null, 2));
   if (report.status === "incomplete") process.exitCode = 2;
