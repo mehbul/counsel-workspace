@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title desc">
+  <title id="title">Counsel workspace</title>
+  <desc id="desc">Free, self-hosted legal work. Apache 2.0. No subscription. Your data, your server.</desc>
+  <rect width="1280" height="360" fill="#f7f3ea"/>
+  <g stroke="#173f35" stroke-opacity="0.07" stroke-width="1">
+    <path d="M0 90h1280M0 180h1280M0 270h1280"/>
+    <path d="M320 0v360M640 0v360M960 0v360"/>
+  </g>
+  <g transform="translate(72 78)">
+    <circle cx="42" cy="42" r="39" fill="none" stroke="#173f35" stroke-width="3"/>
+    <path d="M58 25c-6-5-13-7-20-6-12 2-19 12-18 24 1 13 11 21 24 20 6-1 11-3 15-8" fill="none" stroke="#173f35" stroke-width="4" stroke-linecap="round"/>
+    <path d="M42 70c8-9 14-15 23-18" fill="none" stroke="#8a5a44" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <text x="180" y="156" font-family="Georgia, 'Times New Roman', serif" font-size="82" letter-spacing="-3" fill="#173f35">counsel</text>
+  <text x="184" y="194" font-family="'Segoe UI', Arial, sans-serif" font-size="15" letter-spacing="7" fill="#5c6e63">WORKSPACE</text>
+  <text x="184" y="258" font-family="Georgia, 'Times New Roman', serif" font-size="27" fill="#2c4a3e">Free, self-hosted legal work.</text>
+  <g font-family="'Segoe UI', Arial, sans-serif" fill="#3b5147">
+    <text x="900" y="138" font-size="15" letter-spacing="2">APACHE 2.0</text>
+    <text x="900" y="174" font-size="15" letter-spacing="2">NO SUBSCRIPTION</text>
+    <text x="900" y="210" font-size="15" letter-spacing="2">YOUR DATA, YOUR SERVER</text>
+  </g>
+  <path d="M900 108h304" stroke="#173f35" stroke-opacity="0.25"/>
+  <text x="900" y="272" font-family="'Segoe UI', Arial, sans-serif" font-size="14" fill="#6b7d72">github.com/mehbul/counsel-workspace</text>
+</svg>

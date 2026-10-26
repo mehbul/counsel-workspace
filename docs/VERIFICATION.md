@@ -1,8 +1,8 @@
 # Verification and release status
 
-Repository: https://github.com/mehbul/counsel-workspace (private).
+Repository: https://github.com/mehbul/counsel-workspace.
 
-Code commit `d732d36` passed [GitHub CI run 40308756855](https://github.com/mehbul/counsel-workspace/actions/runs/40308756855) on 26 October 2026. The same 188 tests passed locally. The frontend bundle build, formatting checks, dependency vulnerability audit, Docker image build and hardened-container smoke test passed. Repository scans found no tracked runtime databases, private keys or recognized access-token patterns; this is a bounded check, not an independent security audit.
+This record describes the `0.1.0` public preview. The repository was rebuilt from a sanitized history, so older private-repository commit hashes and Actions run IDs do not apply here. The local suite passes 188 tests. The frontend bundle build, formatting checks and dependency vulnerability audit pass locally. The repository's GitHub Actions workflows repeat those checks and add a Docker image build and hardened-container smoke test. Repository scans found no tracked runtime databases, private keys or recognized access-token patterns; this is a bounded check, not an independent security audit.
 
 ## Verified behavior
 

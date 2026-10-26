@@ -1,0 +1,8 @@
+# Counsel workspace is a public documentation site.
+# This file is a portable template inside the project path. Crawlers read the
+# origin-root robots.txt for the whole mehbul.github.io host.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://mehbul.github.io/counsel-workspace/sitemap.xml

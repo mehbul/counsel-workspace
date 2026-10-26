@@ -1,0 +1,7 @@
+# Gitleaks configuration.
+#
+# The notification tests use a fixed, non-secret value to exercise HMAC
+# signing. It is deliberately fake and must never be treated as a credential.
+[allowlist]
+description = "Fixed fake secret used only by the notification test suite."
+regexes = ['''notification-test-secret-0123456789''']

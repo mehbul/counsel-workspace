@@ -1,57 +1,230 @@
-[![Verify](https://github.com/mehbul/counsel-workspace/actions/workflows/ci.yml/badge.svg)](https://github.com/mehbul/counsel-workspace/actions/workflows/ci.yml)
+<p align="center">
+  <img src="site/assets/banner.svg" alt="Counsel workspace — free, self-hosted legal work" width="100%">
+</p>
 
 # Counsel workspace
 
-A self-hosted legal workspace that Codex, Claude Code and compatible MCP assistants can use without a Legora subscription. Run it with evidence-only retrieval, your existing assistant, or a locally served model. No paid model API is required, and generation is disabled by default. The repository remains private for now. This is an independent implementation, not full Legora parity or a production-equivalence claim.
+**A free, self-hosted legal workspace for contract review, legal research,
+drafting, workflows and client collaboration.** Run it on your own computer or
+server. No Legora subscription, per-seat fee, telemetry, or mandatory model API.
 
-See [assistant and local-model setup](docs/ASSISTANTS.md) for Codex, Claude, other MCP clients and DeepSeek-compatible model options. See [the remaining parity gaps](docs/WORKFLOW-PARITY.md) for what still needs building and verification.
+[![Verify](https://github.com/mehbul/counsel-workspace/actions/workflows/ci.yml/badge.svg)](https://github.com/mehbul/counsel-workspace/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/mehbul/counsel-workspace/actions/workflows/codeql.yml/badge.svg)](https://github.com/mehbul/counsel-workspace/actions/workflows/codeql.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D24.15-339933.svg)](package.json)
 
-## Run
+[Quickstart](#quickstart) · [Features](#what-it-does) · [Screenshots](#screenshots) · [How it compares](#how-it-compares) · [Documentation](docs/) · [Website](https://mehbul.github.io/counsel-workspace/)
 
-Requires Node 24.15 or newer.
+> **0.1 public preview.** Useful and tested, but not independently audited, not
+> legal advice, and not a claim of legal accuracy or Legora equivalence. Read the
+> [disclaimer](DISCLAIMER.md), [security policy](SECURITY.md), and
+> [known limits](#what-it-does-not-do) before putting client material in it.
+
+## Why this exists
+
+Legal AI is increasingly sold per seat to firms with enterprise budgets. Solo
+lawyers, small practices, legal-aid teams, researchers, and people in
+lower-resource jurisdictions are often priced out, even when they handle the
+same contracts and research questions.
+
+Counsel is a serious, inspectable alternative for those users. It runs on a
+laptop or a small server, keeps matter data under your control, works with local
+or bring-your-own models, and exports a portable, checksummed matter archive.
+The source is public under the Apache License 2.0, so you can verify what it
+does, fix it, or extend it.
+
+- **Free and open source.** Apache 2.0, no per-seat fee, no hosted account.
+- **Self-hosted and private by default.** No telemetry. Model generation is off
+  until you configure a provider.
+- **Portable.** Owner/editor matter archives include a manifest, per-file
+  SHA-256 checksums, readable source text, structured records, and an offline
+  verifier. Originals are optional.
+- **Assistant-native.** Connect Codex, Claude Code, or another MCP host with
+  scoped, expiring, revocable keys.
+- **Honest about scope.** The project publishes its tests, synthetic benchmarks,
+  document-disjoint CUAD results, and missing enterprise features. It does not
+  claim parity with a commercial platform.
+
+## Screenshots
+
+| Tabular review                                                                                 | Editor                                                                               |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| ![Tabular review with clause columns and evidence](site/assets/screenshots/tabular-review.png) | ![Collaborative legal editor with cited sources](site/assets/screenshots/editor.png) |
+
+![Approval-gated workflow](site/assets/screenshots/workflow.png)
+
+Screenshots use synthetic seed data.
+
+## Quickstart
+
+### Personal mode (one computer)
+
+Requires Node.js 24.15 or newer.
 
 ```sh
+git clone https://github.com/mehbul/counsel-workspace.git
+cd counsel-workspace
 npm ci
 npm run start:personal
 ```
 
-Open http://127.0.0.1:3000. Personal mode opens directly with no app login, email, password or signup. It binds only to this computer and keeps its SQLite data in `data/personal/workspace.db`, separate from team data. See [personal and team modes](docs/PERSONAL-MODE.md).
+Open <http://127.0.0.1:3000>. Personal mode opens directly with no app login and
+keeps its SQLite data in `data/personal/workspace.db`. It accepts same-origin
+loopback requests only and is intended for one trusted computer and
+operating-system account.
 
-For an authenticated shared installation, run `npm start` or use Docker. Team data stays in `data/workspace.db`. On first team run, use the one-time token in `data/bootstrap-token` to create the owner account. Existing prototype data is preserved and transferred to that owner. Three synthetic contracts seed new workspaces. Upload PDF, DOCX, TXT, MD or CSV documents (20 MB each). Scanned PDFs require external OCR first.
+### Team mode with Docker
 
-## Features
+```sh
+cp .env.example .env
+# Set DOMAIN and, if needed, a model provider.
+docker compose --env-file .env up -d --build
+```
 
-- Persistent matter creation, document import, text viewing, search and deletion.
-- Matter-scoped ranked passage search with deterministic clause anchors, optional semantic candidates and clickable paragraph references.
-- Persisted document comparisons with source coverage, highlighted passage changes, CSV export and DOCX revision export.
-- Reference-integrity reports that check exact quotes and flag missing sources or uncited output paragraphs.
-- Original-file retention, exact page and paragraph anchors, OCR-needed reporting and source-version provenance.
-- Review tables with prompt columns, evidence inspection, editable findings, locks, review status, filtering, sorting and pagination; CSV export.
-- Editable drafting workspace, real DOCX export and tracked insertion through the Office task-pane bridge.
-- Reusable instructions, three executable workflow templates, task lists and activity history.
-- Optional independent approval and distinct-reviewer quorum, revalidated before later workflow actions.
-- A guest-only client portal with explicit document and reviewed-text publication and revocation.
-- Owner/editor matter archives with a manifest, SHA-256 checksums, readable source text, structured records, an owner audit subset and optional retained originals; an offline verifier checks the ZIP without extraction.
-- US Federal Register research, official PDF imports and scheduled publication watches.
-- MCP tools for scoped evidence reading and host-authored drafts, review tables and tasks, with expiring/revocable read or write keys.
-- Optional local Ollama or OpenAI-compatible model generation; explicit provider selection prevents accidental API usage.
-- Responsive layout and accessible native forms/dialogs.
+On first run, use the one-time token in `data/bootstrap-token` to create the
+owner account. Put the app behind HTTPS. Tagged releases also publish a
+container image at `ghcr.io/mehbul/counsel-workspace`.
 
-Evidence-only mode uses deterministic clause-level anchors, metadata extraction, BM25-style passage ranking, legal-concept aliases, document diversity, exact source offsets and conservative abstention. Its review tables extract matching passages and its drafts compile source excerpts. Connected assistants can instead reason over those sources and save their own unreviewed analyses, without Counsel making model API calls. Public Federal Register publication research is available separately. Comprehensive legal research and case-law treatment verification remain incomplete.
+See [deployment and operations](docs/OPERATIONS.md) for TLS, members, matter
+grants, backup/restore, and release gates.
 
-## Optional generated analysis
+### Native team mode
 
-For local generation without a paid model API, follow the Ollama setup in [ASSISTANTS.md](docs/ASSISTANTS.md). To explicitly enable the optional OpenAI API path, set both `AI_PROVIDER=openai` and `OPENAI_API_KEY`. `OPENAI_MODEL` optionally overrides `gpt-4.1-mini`. On Windows PowerShell:
-
-```powershell
-$env:AI_PROVIDER = 'openai'
-$env:OPENAI_API_KEY = 'your-key'
+```sh
+npm ci
 npm start
 ```
 
-This optional path sends the question and retrieved passages to OpenAI and may incur provider charges. No key is bundled. The UI reports model configuration, not live endpoint health. Live provider/model quality has not been verified here. Set `AI_PROVIDER=evidence` to disable generation. MCP host reasoning uses the connected assistant's own plan and limits; a cloud assistant receives returned source text under its provider policy.
+The server listens on port 3000 by default. Set `APP_ORIGIN`, `COOKIE_SECURE`,
+and the other variables in [`.env.example`](.env.example) before exposing it.
 
-## Verify
+### Optional model generation
+
+The default `AI_PROVIDER=evidence` makes no model calls. For local generation,
+install [Ollama](https://ollama.com), pull a model, and set:
+
+```sh
+AI_PROVIDER=ollama
+OLLAMA_MODEL=your-installed-model
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+```
+
+For an OpenAI-compatible endpoint, set `AI_PROVIDER=openai-compatible`,
+`AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY`. For the native OpenAI path, set
+`AI_PROVIDER=openai` and `OPENAI_API_KEY`. Cloud providers receive the question
+and retrieved passages and may charge for use. See
+[assistant and model setup](docs/ASSISTANTS.md).
+
+## What it does
+
+| Area                         | What you get                                                                                                                                                                                                                      |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Matters and documents**    | Persistent matters, PDF/DOCX/TXT/MD/CSV import, original-file retention, page and paragraph anchors, OCR-needed reporting, search, and deletion.                                                                                  |
+| **Review at scale**          | Ranked passage search, deterministic clause anchors, optional semantic candidates, conservative abstention, review tables, evidence inspection, editable findings, locks, status, filtering, sorting, pagination, and CSV export. |
+| **Comparisons and redlines** | Persisted document comparisons, source coverage, highlighted changes, CSV export, DOCX revision export, and tracked insertions through the Office bridge.                                                                         |
+| **Drafting**                 | Rich-text editor, comments, checkpoints, proposed edits with accept/reject, source citations, and real DOCX export.                                                                                                               |
+| **Workflows**                | Versioned templates, ordered steps, selected sources, durable runs, approval gates with independent approvers and quorum, retries, cancellation, and schedules.                                                                   |
+| **Client portal**            | Separate guest accounts, explicit document and reviewed-text publication, selected recipients, matter grants, and immediate revocation.                                                                                           |
+| **Research**                 | US Federal Register and eCFR imports with official-origin pinning, bounded requests, matter-scoped publication watches, deduplicated alerts, and source provenance.                                                               |
+| **Notifications**            | Owner-only encrypted channels for signed webhooks, Slack, and Microsoft Teams; workflow and monitor events; durable retries and receipts.                                                                                         |
+| **Matter archives**          | Portable ZIP exports with `manifest.json`, `SHA256SUMS`, readable source text, structured records, a capped owner audit subset, and optional retained originals.                                                                  |
+| **Assistants**               | MCP tools for scoped evidence reading and host-authored drafts, review tables, and tasks, with expiring and revocable keys.                                                                                                       |
+| **Deployment**               | Personal mode, native team mode, Docker Compose, hardened-container checks, online backup, and restore guidance.                                                                                                                  |
+
+Evidence-only mode uses deterministic clause-level anchors, metadata extraction,
+BM25-style passage ranking, legal-concept aliases, document diversity, exact
+source offsets, and conservative abstention. It does not invent a model answer.
+Connected assistants can reason over the same sources and save their own
+unreviewed analyses; Counsel itself does not call a model unless you enable one.
+
+## Matter archives
+
+An owner or editor can export a matter from the Documents page. The archive
+contains:
+
+```text
+README.txt
+manifest.json
+SHA256SUMS
+matter/*.json
+documents/*.txt
+drafts/*.txt
+originals/*        (optional)
+```
+
+Verify it without extracting:
+
+```sh
+npm run verify:archive -- path/to/counsel-matter.zip
+```
+
+The verifier checks the ZIP structure and bounds, required files, checksum
+coverage, manifest sizes and hashes, counts, the matter ID, and the payload
+format. Archives are checksummed but **not encrypted, signed, or notarized**;
+they are portable matter exports, not encrypted workspace backups. There is no
+archive import or restore command. See
+[Matter archives](docs/MATTER-ARCHIVE.md).
+
+## How it compares
+
+|                             | Counsel workspace                                             | Legora                                                |
+| --------------------------- | ------------------------------------------------------------- | ----------------------------------------------------- |
+| **Price**                   | Free, Apache 2.0                                              | Commercial subscription                               |
+| **Hosting**                 | Your computer or server                                       | Vendor-hosted                                         |
+| **Source**                  | Public and inspectable                                        | Proprietary                                           |
+| **Data location**           | Your infrastructure                                           | Vendor infrastructure                                 |
+| **Models**                  | Local Ollama, bring-your-own compatible API, or no generation | Vendor-managed                                        |
+| **Enterprise integrations** | Limited connectors; iManage/NetDocuments not implemented      | Broader DMS, Word, and enterprise integration surface |
+| **Support**                 | Community, best effort                                        | Commercial support                                    |
+| **Scope**                   | Smaller, 0.1, single-instance                                 | Broader commercial platform                           |
+
+This table is based on Legora's public materials as of October 2026. Features and
+pricing change, and this is not a feature-by-feature audit. **No blinded
+legal-quality comparison has been run.** If you need a supported enterprise
+platform with mature DMS and tenant integrations, a commercial product may be the
+right choice. If you need a free, private, inspectable workspace and can operate
+it yourself, Counsel is for you.
+
+## What it does not do
+
+- No OCR. Scanned PDFs need external OCR first.
+- No SSO, SCIM, MFA, or enterprise directory integration.
+- No iManage or NetDocuments adapter, provider ACL sync, or ethical-wall mapping.
+- No archive import, restore, encryption, signature, or notarization.
+- No multi-instance or high-availability mode.
+- No independent security audit, penetration test, or legal review.
+- No guarantee of legal accuracy. The clause engine's document-disjoint CUAD
+  validation score is 33.98% answerable-only token F1 and 77.05% answerability
+  balanced accuracy. The retrieval benchmark is synthetic and was designed
+  alongside the implementation. These are regression measurements, not
+  legal-quality evidence.
+- No guarantee that a third-party model provider keeps data confidential.
+- No legal advice, attorney-client relationship, or substitute for a lawyer.
+
+Read [the verification and release status](docs/VERIFICATION.md) and
+[the external legal evaluation](docs/LEGAL-EVALUATION.md) for the exact evidence
+behind these statements.
+
+## Security and trust
+
+- Argon2 password hashing, revocable sessions, CSRF and origin checks, rate
+  limits, and workspace/matter authorization.
+- Owner, editor, viewer, and guest separation, with current grants rechecked
+  before later workflow actions.
+- Encrypted connector and notification secrets.
+- SSRF-resistant outbound requests, upload parsing limits, and a dependency-free
+  ZIP reader with path, duplicate, encryption, symlink, and checksum checks.
+- GitHub CI builds the app, runs the test suite, audits dependencies, builds the
+  Docker image, and smoke-tests a hardened container.
+- CodeQL, Dependabot, dependency review, and a full-history secret scan are part
+  of the public repository.
+
+The project is a single-instance, self-hosted foundation. The operator is
+responsible for TLS, host hardening, backups, account administration, and
+compliance. See [SECURITY.md](SECURITY.md), [the threat model](docs/THREAT-MODEL.md),
+and [PRIVACY.md](PRIVACY.md).
+
+## Verify locally
 
 ```sh
 npm test
@@ -61,16 +234,31 @@ npm run format:check
 npm run verify:archive -- path/to/archive.zip
 ```
 
-Integration tests use isolated in-memory databases and temporary data directories. They verify import, scoped citations, comparisons, reference checks, source selection, extraction, locks, edits, collaboration, security regressions and DOCX export. See [quality checks and measured limits](docs/QUALITY.md) and the [external CUAD evaluation](docs/LEGAL-EVALUATION.md) for measured results, including the document-disjoint development and validation scores. The validation score is materially below development and is not a Legora comparison. Matter-archive layout, access rules, limits and verification are documented in [MATTER-ARCHIVE.md](docs/MATTER-ARCHIVE.md).
+Integration tests use isolated in-memory databases and temporary data
+directories. They cover import, scoped citations, comparisons, reference checks,
+source selection, extraction, locks, edits, collaboration, security regressions,
+portal isolation, workflow approvals, notification delivery, archive access and
+integrity, and DOCX export.
 
-## Self-hosted deployment
+## Contributing
 
-See [deployment and operations](docs/OPERATIONS.md) for Docker Compose, HTTPS, initial setup, members, matter access, backup/restore and release gates. GitHub CI verified the Docker image build, hardened container startup and anonymous API rejection. Live HTTPS deployment and enterprise provider connections remain unverified.
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md). Security issues should be reported
+privately through [GitHub Security Advisories](https://github.com/mehbul/counsel-workspace/security/advisories/new),
+not in a public issue.
 
-## Boundaries
+Good first areas: documentation, accessibility, synthetic test fixtures,
+deployment guides, and small connector improvements. Large features should start
+as an issue so scope and access-control impact can be reviewed.
 
-Authentication, workspace isolation, matter grants, local accounts, revocable sessions, owner-managed members, persisted background review/draft jobs and audit records are implemented. This remains a single-instance foundation, not an independently audited production equivalent of Legora. Licensed research, OCR, tenant-installed Word/Outlook add-ins, full DMS permission synchronization, SSO/MFA, comprehensive external monitoring feeds and email notification delivery are still missing. Rich-text Yjs collaboration, comments, checkpoints, DOCX revision export, Microsoft/Google snapshot connectors, an Office task-pane bridge, client portals, in-app document monitors, Federal Register publication watches, signed webhook/Slack/Teams notification delivery and checksummed matter archives are implemented; see docs/COLLABORATION-AND-CONNECTORS.md, docs/OFFICE.md, docs/RESEARCH.md, docs/MATTER-ARCHIVE.md, docs/OPERATIONS.md and docs/WORKFLOW-PARITY.md. Matter archives are portable exports, not encrypted or signed full-workspace backups, and there is no archive import or restore command. Extracted text is stored rather than original-file layout. Review tables still use deterministic passage extraction; generated assistant/draft analysis requires a configured provider. Read the operations document before deployment.
+## License
 
-## Workflow orchestration
+Apache License 2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and
+[third-party notices](THIRD-PARTY-NOTICES.md).
 
-The Workflows library now supports an ordered-step builder, versioned definitions, selected sources, durable runs, approval gates, retry/cancel and links to resulting reviews/drafts/tasks. Intake tracks requests and responsible lawyers; document monitors turn new matching evidence into follow-up tasks. Skills have revision history, and shared drafts support proposed edits with accept/reject. See [workflow comparison and remaining gaps](docs/WORKFLOW-PARITY.md) for the exact implementation and limits.
+"Legora" is a trademark of its respective owner. Counsel workspace is an
+independent project and is not affiliated with, endorsed by, or sponsored by
+Legora or any other commercial legal-AI provider.
+
+If this project is useful to you, star the repository so other small practices
+can find it.

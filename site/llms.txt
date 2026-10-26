@@ -1,0 +1,133 @@
+# Counsel workspace
+
+> Counsel workspace is a free, Apache-2.0, self-hosted legal workspace for
+> contract review, legal research, drafting, workflows and matter collaboration.
+> It runs on a laptop or a small server. There is no hosted service, seat fee,
+> telemetry or mandatory model API. Optional local Ollama or bring-your-own
+> model generation is available but disabled by default.
+
+Canonical site: https://mehbul.github.io/counsel-workspace/
+Source: https://github.com/mehbul/counsel-workspace
+License: Apache License 2.0
+Version: 0.1.0, first public preview, 26 October 2026
+
+## Start here
+
+- [README](https://github.com/mehbul/counsel-workspace#readme): mission,
+  quickstart, feature table, screenshots, comparison, limits and license.
+- [Deployment and operations](https://github.com/mehbul/counsel-workspace/blob/main/docs/OPERATIONS.md):
+  Docker Compose, TLS, owner setup, members, matter grants, backup and restore.
+- [Security policy](https://github.com/mehbul/counsel-workspace/blob/main/SECURITY.md):
+  reporting, supported versions, security boundaries and residual risk.
+- [Threat model](https://github.com/mehbul/counsel-workspace/blob/main/docs/THREAT-MODEL.md):
+  assets, trust boundaries, actors, mitigations and operator checklist.
+- [Verification and release status](https://github.com/mehbul/counsel-workspace/blob/main/docs/VERIFICATION.md):
+  what is tested locally and in CI, and what is not established.
+- [Legal evaluation](https://github.com/mehbul/counsel-workspace/blob/main/docs/LEGAL-EVALUATION.md):
+  CUAD method, document-disjoint split and measured limits.
+- [Matter archives](https://github.com/mehbul/counsel-workspace/blob/main/docs/MATTER-ARCHIVE.md):
+  archive layout, access rules, checksums and the offline verifier.
+- [Assistant and MCP setup](https://github.com/mehbul/counsel-workspace/blob/main/docs/ASSISTANTS.md):
+  stdio and HTTP MCP, scopes, connection files and client configuration.
+- [Product facts](https://mehbul.github.io/counsel-workspace/product.json):
+  machine-readable capabilities, requirements, licensing and exclusions.
+- [Changelog](https://github.com/mehbul/counsel-workspace/blob/main/CHANGELOG.md):
+  release notes and known limitations.
+
+## What it does
+
+- Personal mode for one trusted computer, with loopback-only access and synthetic
+  seed data.
+- Team mode with owner-created accounts, Argon2 password hashing, revocable
+  sessions, CSRF and origin checks, rate limits and owner/editor/viewer/guest
+  roles.
+- Matters, PDF/DOCX/TXT/MD/CSV import, original-file retention, page and paragraph
+  anchors, and OCR-needed reporting.
+- Matter-scoped ranked passage search, deterministic clause anchors, optional
+  semantic candidates and conservative abstention.
+- Review tables with evidence inspection, editable findings, locks, status,
+  filtering, sorting, pagination and CSV export.
+- Document comparisons, highlighted changes, CSV export, DOCX revision export
+  and tracked insertions through an Office bridge.
+- Rich-text drafts, comments, checkpoints, proposed edits and DOCX export.
+- Reusable instructions, versioned workflow templates, approval gates, durable
+  runs, retries, cancellation and schedules.
+- Intake tracking, document monitors and follow-up tasks.
+- Guest-only client portal with explicit publication and immediate revocation.
+- US Federal Register research and eCFR imports with official-origin pinning,
+  bounded requests and publication watches.
+- Owner-only encrypted notification channels for signed webhooks, Slack and
+  Microsoft Teams, with durable retries and receipts.
+- Matter archives with a manifest, SHA-256SUMS, readable source text, structured
+  records, an owner audit subset, optional originals and an offline verifier.
+- MCP integration for scoped evidence reading and host-authored drafts, reviews
+  and tasks, with expiring and revocable keys.
+- Optional local Ollama, OpenAI-compatible, Anthropic and OpenAI generation.
+- Docker Compose deployment, hardened-container CI checks, online backup and
+  restore documentation.
+
+## What it does not do
+
+- No OCR. Scanned PDFs need external OCR first.
+- No SSO, SCIM, MFA or enterprise directory integration.
+- No iManage or NetDocuments adapter, provider ACL sync or ethical-wall mapping.
+- No archive import, restore, encryption, signature or notarization.
+- No multi-instance or high-availability mode.
+- No independent security audit, penetration test or legal review.
+- No guarantee of legal accuracy.
+- No blinded legal-quality comparison with Legora or any commercial product.
+- No live Slack or Teams tenant acceptance.
+- No legal advice or attorney-client relationship.
+
+## Quickstart
+
+Personal mode, requires Node.js 24.15 or newer:
+
+```sh
+git clone https://github.com/mehbul/counsel-workspace.git
+cd counsel-workspace
+npm ci
+npm run start:personal
+```
+
+Open http://127.0.0.1:3000. Personal mode is for one trusted computer and
+operating-system account. It is not a way to share confidential material over a
+network.
+
+Team mode with Docker:
+
+```sh
+cp .env.example .env
+# Set DOMAIN in .env
+docker compose --env-file .env up -d --build
+```
+
+On first run, create the owner with the one-time token in
+`data/bootstrap-token`. Put the app behind HTTPS. Tagged releases publish
+`ghcr.io/mehbul/counsel-workspace`.
+
+## Verification
+
+- `npm test` covers authentication, authorization, CSRF, matter isolation,
+  import, citations, review, comparisons, drafting, collaboration, workflows,
+  portal access, notifications, archives and DOCX export.
+- `npm run benchmark` reports 100% hit@3 and 0 false positives on a synthetic
+  suite designed alongside the implementation. It is a regression check, not
+  held-out evidence.
+- The clause engine scored 33.98% answerable-only token F1 and 77.05%
+  answerability balanced accuracy on a document-disjoint CUAD validation split.
+  This is not a legal-accuracy guarantee.
+- GitHub Actions runs the test suite, build, format check, dependency audit,
+  Docker build and a hardened-container smoke test.
+
+## Licensing and trademark
+
+The project is licensed under the Apache License 2.0. It is not affiliated with,
+endorsed by or sponsored by Legora or any other commercial legal-AI provider.
+"Legora" is a trademark of its respective owner.
+
+## Contact
+
+- Issues: https://github.com/mehbul/counsel-workspace/issues
+- Security reports: https://github.com/mehbul/counsel-workspace/security/advisories/new
+- Releases: https://github.com/mehbul/counsel-workspace/releases

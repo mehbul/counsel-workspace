@@ -1,0 +1,108 @@
+{
+  "name": "Counsel workspace",
+  "version": "0.1.0",
+  "releaseDate": "2026-10-26",
+  "description": "Free, self-hosted legal workspace for contract review, legal research, drafting, workflows and matter collaboration. Apache 2.0. No hosted service, seat fee, telemetry or mandatory model API.",
+  "url": "https://mehbul.github.io/counsel-workspace/",
+  "source": "https://github.com/mehbul/counsel-workspace",
+  "documentation": "https://github.com/mehbul/counsel-workspace#readme",
+  "license": "Apache-2.0",
+  "pricing": {
+    "model": "free",
+    "price": 0,
+    "currency": "USD",
+    "notes": "No hosted service or seat fee. The operator pays for hardware and for any optional model provider."
+  },
+  "deployment": ["personal", "native team server", "docker compose"],
+  "requirements": {
+    "node": ">=24.15.0",
+    "npm": ">=11",
+    "docker": "optional; Docker Engine with Compose v2 for the supplied team deployment",
+    "database": "SQLite"
+  },
+  "capabilities": [
+    "Personal mode with loopback-only access and synthetic seed data",
+    "Team mode with owner, editor, viewer and guest roles",
+    "Argon2 password hashing, revocable sessions, CSRF and origin checks, rate limits",
+    "Matters and PDF, DOCX, TXT, Markdown and CSV import",
+    "Original-file retention and page and paragraph anchors",
+    "Matter-scoped ranked passage search and deterministic clause anchors",
+    "Review tables with evidence inspection, locks, filters and CSV export",
+    "Document comparisons, highlighted changes and DOCX revision export",
+    "Rich-text drafting with comments, checkpoints, proposed edits and DOCX export",
+    "Versioned workflow templates, approval gates, retries, cancellation and schedules",
+    "Intake tracking, document monitors and follow-up tasks",
+    "Guest-only client portal with explicit publication and immediate revocation",
+    "US Federal Register research and eCFR imports with publication watches",
+    "Signed webhook, Slack and Microsoft Teams notifications with durable receipts",
+    "Checksummed matter archives with an offline verifier",
+    "MCP integration with expiring and revocable keys",
+    "Optional local Ollama, OpenAI-compatible, Anthropic and OpenAI generation",
+    "Docker Compose deployment, online backup and restore guidance"
+  ],
+  "optionalIntegrations": [
+    "Ollama",
+    "OpenAI-compatible endpoints",
+    "Anthropic",
+    "OpenAI",
+    "Google Drive",
+    "Microsoft Graph",
+    "Slack incoming webhooks",
+    "Microsoft Teams incoming webhooks",
+    "Generic signed webhooks",
+    "MCP hosts such as Codex and Claude Code"
+  ],
+  "exclusions": [
+    "No OCR for scanned PDFs",
+    "No SSO, SCIM or MFA",
+    "No iManage or NetDocuments adapter",
+    "No provider ACL or ethical-wall synchronization",
+    "No archive import, restore or merge command",
+    "No archive encryption, signature or notarization",
+    "No multi-instance or high-availability mode",
+    "No independent security audit or penetration test",
+    "No independent legal review",
+    "No guarantee of legal accuracy",
+    "No blinded legal-quality comparison with Legora or any commercial product",
+    "No live Slack or Microsoft Teams tenant acceptance",
+    "Not legal advice and no attorney-client relationship"
+  ],
+  "security": {
+    "independentAudit": false,
+    "encryptionAtRest": false,
+    "auditLog": true,
+    "secretScanning": true,
+    "codeql": true,
+    "dependencyReview": true,
+    "hardenedContainerCheck": true,
+    "threatModel": "https://github.com/mehbul/counsel-workspace/blob/main/docs/THREAT-MODEL.md",
+    "policy": "https://github.com/mehbul/counsel-workspace/blob/main/SECURITY.md"
+  },
+  "verification": {
+    "testCount": 188,
+    "testCountScope": "v0.1.0 local suite",
+    "ci": "GitHub Actions: tests, build, format check, dependency audit, Docker build and hardened-container smoke test",
+    "retrievalBenchmark": {
+      "kind": "synthetic regression suite",
+      "hitAt3": 1.0,
+      "falsePositives": 0,
+      "notes": "Designed alongside the implementation; not held-out evidence."
+    },
+    "clauseEvaluation": {
+      "dataset": "CUAD v1",
+      "split": "document-disjoint local validation split",
+      "documents": 5,
+      "answerableOnlyTokenF1": 0.3398,
+      "answerabilityBalancedAccuracy": 0.7705,
+      "notes": "Small sample. The validation partition has been inspected and is no longer fresh. Not a legal-accuracy guarantee."
+    },
+    "blindedLegoraComparison": false,
+    "liveSlackTeamsAcceptance": false,
+    "productionDeploymentDrill": false
+  },
+  "trademark": "Legora is a trademark of its respective owner. Counsel workspace is independent and not affiliated with, endorsed by or sponsored by Legora or any other commercial legal-AI provider.",
+  "contact": {
+    "issues": "https://github.com/mehbul/counsel-workspace/issues",
+    "security": "https://github.com/mehbul/counsel-workspace/security/advisories/new"
+  }
+}

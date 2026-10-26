@@ -6,6 +6,17 @@ COPY client ./client
 RUN npm run build
 
 FROM node:24.20.0-bookworm-slim
+ARG VERSION=0.1.0
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="Counsel workspace" \
+      org.opencontainers.image.description="Free, self-hosted legal workspace for contract review, legal research, drafting, workflows and matter collaboration." \
+      org.opencontainers.image.source="https://github.com/mehbul/counsel-workspace" \
+      org.opencontainers.image.url="https://mehbul.github.io/counsel-workspace/" \
+      org.opencontainers.image.documentation="https://github.com/mehbul/counsel-workspace#readme" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.vendor="Counsel workspace contributors" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATA_DIR=/data
 WORKDIR /app
 COPY package.json package-lock.json ./

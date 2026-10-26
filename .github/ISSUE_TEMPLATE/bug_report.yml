@@ -1,0 +1,79 @@
+name: Bug report
+description: Report a reproducible problem without including client data or secrets.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Do not include client documents, matter text,
+        passwords, cookies, API keys, or personal data. Use synthetic examples.
+        Security vulnerabilities must be reported privately; see SECURITY.md.
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - Personal mode
+        - Team mode
+        - Docker Compose
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release tag or commit you are running.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Node.js version, browser, and database mode.
+      placeholder: "Windows 11, Node 24.15.0, Chrome 141, SQLite"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest sequence that triggers the problem.
+      placeholder: |
+        1. Start personal mode
+        2. Import a synthetic contract
+        3. Open ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the visible error. Attach a screenshot only after removing sensitive content.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove cookies, tokens, document text, email addresses, and local paths.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed client data, credentials, cookies, and personal data.
+          required: true
+        - label: I searched existing issues and the documentation.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

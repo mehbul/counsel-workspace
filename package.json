@@ -1,13 +1,13 @@
 {
   "name": "counsel-workspace",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "0.1.0",
+  "description": "Free, self-hosted legal workspace for contract review, legal research, drafting, workflows and matter collaboration. No Legora subscription and no mandatory model API.",
+  "main": "server.js",
   "scripts": {
     "test": "node --test --test-concurrency=2",
     "start": "node server.js",
     "backup": "node scripts/backup.js",
-    "format:check": "prettier --check server.js agent-api.js agent-contract.js models.js retrieval.js evidence.js comparisons.js portal.js legal-sources.js research.js personal.js evaluation mcp security.js jobs.js collaboration.js connectors.js connector-list.js drafting.js workflows.js rich-text.js parser.js parse-process.js parse-worker.js secret-box.js notifications.js zip.js matter-archive.js document-files.js client public/app.js public/auth.js public/assistants.js public/quality.js public/portal.js public/portal.html public/research.js public/connectors.js public/notifications.js public/drafting.js public/workflows.js public/style.css public/index.html test scripts",
+    "format:check": "prettier --check server.js agent-api.js agent-contract.js models.js retrieval.js evidence.js comparisons.js portal.js legal-sources.js research.js personal.js evaluation mcp security.js jobs.js collaboration.js connectors.js connector-list.js drafting.js workflows.js rich-text.js parser.js parse-process.js parse-worker.js secret-box.js notifications.js zip.js matter-archive.js document-files.js client public/app.js public/auth.js public/assistants.js public/quality.js public/portal.js public/portal.html public/research.js public/connectors.js public/notifications.js public/drafting.js public/workflows.js public/style.css public/index.html site/index.html site/styles.css site/404.html site/product.json test scripts",
     "build": "esbuild client/collaboration.js --bundle --minify --outfile=public/collaboration.bundle.js",
     "prestart": "npm run build",
     "mcp": "node mcp/server.mjs",
@@ -18,9 +18,34 @@
     "evaluate:codex": "node scripts/evaluate-codex.js",
     "prestart:personal": "npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "legal-tech",
+    "legal-ai",
+    "legora-alternative",
+    "self-hosted",
+    "contract-review",
+    "document-review",
+    "legal-research",
+    "matter-management",
+    "mcp",
+    "model-context-protocol",
+    "privacy",
+    "local-first",
+    "ai-agents",
+    "ollama",
+    "docx",
+    "pdf"
+  ],
+  "author": "Counsel workspace contributors",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mehbul/counsel-workspace.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mehbul/counsel-workspace/issues"
+  },
+  "homepage": "https://mehbul.github.io/counsel-workspace/",
   "type": "commonjs",
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
