@@ -44,7 +44,11 @@ accurate, or equivalent to a commercial product.
       empty-matter archives.
 - [x] Headless browser download accepted by the verifier.
 - [x] GitHub CI passes on the public repository.
-- [x] CodeQL analysis completes without unresolved high-severity findings.
+- [x] CodeQL analysis completes without unresolved high-severity findings. All
+      four high-severity findings were fixed in code; the `test` directory is
+      excluded from analysis and five remaining medium findings were dismissed
+      as false positives with written justifications (see
+      `docs/VERIFICATION.md`).
 - [ ] Dependency-review workflow runs on a pull request.
 - [x] Release workflow publishes a container image to GHCR.
 - [x] GitHub Pages deployment succeeds and the landing page is reachable.

@@ -15,6 +15,18 @@ On 26 October 2026, commit `c30c12b` passed the public repository checks:
 
 Tag `v0.1.0` points at this commit. None of these checks is an independent security or legal review.
 
+On 26 October 2026, the upstream commits `f98db6b` and `dc187e5` also passed [Verify run 40318988516](https://github.com/mehbul/counsel-workspace/actions/runs/40318988516) with 188 tests, and [CodeQL run 40318988513](https://github.com/mehbul/counsel-workspace/actions/runs/40318988513) on the security-extended query set.
+
+## CodeQL triage
+
+The first public CodeQL runs reported 22 open alerts: 4 high and 18 medium. All 4 high-severity findings were fixed in code in `f98db6b` and no longer appear:
+
+- `model-settings.js` and `scripts/evaluate-legal.js` created files after an existence check; they now create files through exclusive `openSync("wx")` file descriptors and treat `EEXIST` as "already exists".
+- `connector-list.js` quote-escaped Google Drive folder identifiers, which cannot escape backslashes; folder identifiers are now allowlisted against `^[A-Za-z0-9_-]{1,200}$` and rejected otherwise.
+- `ecfr-source.js` stripped markup in one pass and decoded entities afterwards; sanitization now decodes entities first, removes tags repeatedly until the result stops changing, and finally removes any remaining angle brackets, so no markup can survive into plain text.
+
+Test scaffolding by design reads its own local fixture tokens and writes temporary connection files for loopback servers, which permanently matches file-to-HTTP pattern queries. The CodeQL configuration (`.github/codeql-config.yml`) therefore excludes the `test` directory, leaving production code analyzed in full. The five remaining medium findings were triaged and dismissed as false positives with written justifications recorded on each alert: the MCP server and diagnostic tool fetch only the operator-created connection file's own origin and token (trusted local configuration, documented in the threat model), and the optional local smoke scripts read their own ephemeral bootstrap tokens and write temporary connection files for loopback-only servers. As of 26 October 2026 there are no open code-scanning, secret-scanning or Dependabot alerts. This remains a bounded static-analysis result, not an independent security audit.
+
 ## Verified behavior
 
 - Anonymous APIs deny access. Owner setup needs a single-use local token. Password changes and disabled users revoke existing sessions.
