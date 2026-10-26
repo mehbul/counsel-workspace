@@ -180,7 +180,8 @@ test("notification channels sign, retry and retain deliveries across workflow an
       403,
     );
 
-    const secret = "notification-test-secret-0123456789";
+    // Test-only fixture, not a real credential.
+    const secret = "notification-test-secret-0123456789"; // gitleaks:allow
     const created = await owner.req("notification-channels", {
       name: "Operations webhook",
       kind: "webhook",
