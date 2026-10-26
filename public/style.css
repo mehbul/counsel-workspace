@@ -836,6 +836,81 @@ select {
   justify-content: space-between;
   align-items: center;
 }
+.notification-section {
+  margin-bottom: 46px;
+}
+.notification-title h2 {
+  margin: 0 0 4px;
+}
+.notification-title p {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.event-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 18px;
+}
+.event-pills .pill {
+  font-size: 9px;
+}
+.notification-status {
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 9px;
+  color: var(--muted);
+}
+.notification-status.delivered {
+  color: #537a49;
+}
+.notification-status.dead {
+  color: #a45144;
+}
+.notification-status.pending,
+.notification-status.sending {
+  color: #9a7c37;
+}
+.secretbox {
+  background: #f1f5ed;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px;
+  font:
+    12px/1.6 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  word-break: break-all;
+  user-select: all;
+}
+.checkgrid {
+  border: 0;
+  padding: 0;
+  margin: 4px 0 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 18px;
+}
+.checkgrid legend {
+  font-size: 12px;
+  margin-bottom: 10px;
+  padding: 0;
+}
+.checkgrid label,
+label.inline {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+}
+.checkgrid input,
+label.inline input {
+  width: auto;
+  display: inline-block;
+  margin: 0 6px 0 0;
+  vertical-align: middle;
+}
 .board {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1542,4 +1617,10 @@ aside {
 }
 .publication-alert {
   margin-top: 18px;
+}
+
+@media (max-width: 720px) {
+  .checkgrid {
+    grid-template-columns: 1fr;
+  }
 }

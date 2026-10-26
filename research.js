@@ -14,6 +14,7 @@ function installResearch(app, db, security, save, dependencies = {}) {
   const searchRegulations = dependencies.searchEcfr || ecfr.searchEcfr;
   const getRegulation = dependencies.ecfrDocument || ecfr.ecfrDocument;
   const parse = dependencies.parse || require("./parser").parseDocument;
+  const notify = dependencies.notify || null;
   db.exec(
     "CREATE TABLE IF NOT EXISTS research_watches(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,actor TEXT NOT NULL,matter_id TEXT NOT NULL,data TEXT NOT NULL,next_scan INTEGER NOT NULL,enabled INTEGER NOT NULL)",
   );
@@ -352,15 +353,19 @@ function installResearch(app, db, security, save, dependencies = {}) {
     if (!activeActor(row.actor, row.workspace_id, row.matter_id))
       throw fail(403, "The watch creator's access was revoked.");
     const seen = new Set(d.seen),
-      now = new Date().toISOString();
+      now = new Date().toISOString(),
+      added = [];
     for (const source of found.results) {
-      if (!seen.has(source.documentNumber))
-        d.alerts.unshift({
+      if (!seen.has(source.documentNumber)) {
+        const alert = {
           id: randomUUID(),
           source,
           detectedAt: now,
           dismissed: false,
-        });
+        };
+        d.alerts.unshift(alert);
+        added.push(alert);
+      }
       seen.add(source.documentNumber);
     }
     d.alerts = d.alerts.slice(0, 200);
@@ -376,6 +381,18 @@ function installResearch(app, db, security, save, dependencies = {}) {
           ? new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
           : d.from;
     put(row, d);
+    if (added.length && notify) {
+      const matter = c().state.matters.find((m) => m.id === row.matter_id);
+      notify({
+        event: "monitor.alert",
+        title: `Publication watch: ${d.query}`,
+        text: `${added.length} new publication${added.length === 1 ? "" : "s"} matched this watch for ${matter?.name || "a matter"}.${found.partial ? " Only the first 100 matching publications were scanned." : ""}`,
+        matterId: row.matter_id,
+        resourceId: row.id,
+        link: "/",
+        key: `monitor:${row.id}:${added[0].id}`,
+      });
+    }
     security.audit(
       c().workspaceId,
       c().actor,

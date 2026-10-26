@@ -54,6 +54,18 @@ Account recovery is an offline host-administrator operation. Stop the app, put t
 
 Before upgrades: verify a recent backup, run CI and dependency audit, build the image in staging, exercise login/roles/grants/import/review/export, then deploy. Pin approved image digests in your release system; the supplied Docker tags are explicit versions but not immutable digests. Rollback is a coordinated app-image and database-backup operation, not just switching an image tag after a schema change.
 
+## Notifications and webhook egress
+
+Owners manage outbound channels at Notifications. Three kinds are supported: a generic signed webhook, a Slack incoming webhook and a Microsoft Teams incoming webhook. Channel URLs and generic signing secrets are encrypted with AES-256-GCM under `DATA_DIR/integration-key`. Back that key up with the database; without it, channel credentials and connector tokens cannot be decrypted. Treat Slack and Teams webhook URLs as bearer credentials.
+
+Public destinations must use HTTPS. Private, loopback, link-local and internal hostnames are blocked, redirects are not followed, the resolved address is pinned, embedded credentials and URL fragments are rejected, and requests time out. `ALLOW_PRIVATE_WEBHOOKS=true` permits private or local targets and plain HTTP for local development and tests only; it is not passed through the supplied Compose file and must not be enabled in a shared deployment.
+
+Generic deliveries include `X-Counsel-Signature: v1=<hex>`, `X-Counsel-Timestamp` and `X-Counsel-Event`. The signature is HMAC-SHA256 over `${timestamp}.${body}`. Receivers should verify it with the channel secret and reject stale timestamps. Slack and Teams URLs are treated as credentials and receive no custom signature header.
+
+Delivery is durable and retried after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours, up to five attempts. The receipt list records status, attempts, response code, a bounded response excerpt, error and next attempt; receipts remain after a channel is deleted. A selected channel can be tested before use, and a failed or pending delivery can be retried manually. Delivery confirms transport only. It does not prove that a person read or acted on the alert.
+
+The container needs outbound HTTPS access to the configured destinations. An HTTP egress proxy is not implemented, and no real Slack or Teams tenant was available for acceptance; those payloads are verified against local receivers only. Alert the operations team through a separate path if notification delivery itself must be monitored.
+
 ## Staging release checklist
 
 - Build image and validate Compose; confirm non-root execution and no directly published app port.
@@ -61,13 +73,14 @@ Before upgrades: verify a recent backup, run CI and dependency audit, build the 
 - Create owner, editor and viewer; prove denied matter access, grant, revoke, logout and disabled-user behavior in separate browsers.
 - Import a representative PDF, DOCX and scanned PDF; verify expected unsupported-OCR behavior and malformed-file failures.
 - Queue a run, restart the app, verify recovery and no duplicate persisted output; simulate provider outage and invalid credentials.
+- Add a notification channel against an approved staging receiver, verify the HMAC signature and event header, force a delivery failure, confirm retry state and manual retry, and confirm receipts remain after channel deletion.
 - Backup and restore to a second volume and compare meaningful application records, including access grants and reviewed cells.
 - Run realistic concurrent load tests; measure request latency, queue wait, memory and disk usage against your required workload.
 - Obtain independent security review and legal-domain quality review before sensitive client use.
 
 ## Remaining gaps relative to the requested goal
 
-The application still does not implement Legora's licensed legal-research sources, legal-authority validation, production-grade retrieval quality, OCR, layout-preserving original-document rendering, permissions-preserving DMS synchronization, tenant-wide Office add-in deployment, comprehensive external monitoring feeds, MFA/SSO, email/Teams/Slack notifications, provider spend quotas or independent compliance certification. Office task-pane actions, client portals, rich-text Yjs collaboration, comments, checkpoints, DOCX revision export, in-app document monitors and public Federal Register publication watches are implemented; their limits are documented in [OFFICE.md](OFFICE.md), [COLLABORATION-AND-CONNECTORS.md](COLLABORATION-AND-CONNECTORS.md), [RESEARCH.md](RESEARCH.md) and [WORKFLOW-PARITY.md](WORKFLOW-PARITY.md). SQLite currently stores each workspace as a JSON record, which limits write throughput and increases memory use as workspaces grow. These are substantial engineering workstreams, not configuration switches. This release must not be represented as full Legora parity.
+The application still does not implement Legora's licensed legal-research sources, legal-authority validation, production-grade retrieval quality, OCR, layout-preserving original-document rendering, permissions-preserving DMS synchronization, tenant-wide Office add-in deployment, comprehensive external monitoring feeds, MFA/SSO, email notification delivery, HTTP egress-proxy support, provider spend quotas or independent compliance certification. Office task-pane actions, client portals, rich-text Yjs collaboration, comments, checkpoints, DOCX revision export, in-app document monitors, public Federal Register publication watches and signed webhook/Slack/Teams notification delivery are implemented; their limits are documented in [OFFICE.md](OFFICE.md), [COLLABORATION-AND-CONNECTORS.md](COLLABORATION-AND-CONNECTORS.md), [RESEARCH.md](RESEARCH.md) and [WORKFLOW-PARITY.md](WORKFLOW-PARITY.md). SQLite currently stores each workspace as a JSON record, which limits write throughput and increases memory use as workspaces grow. These are substantial engineering workstreams, not configuration switches. This release must not be represented as full Legora parity.
 
 The frontend still uses inline event handlers, so its CSP allows inline scripts. All document and user strings are escaped when rendered, and dynamic identifiers are server-generated UUIDs, but eliminating inline handlers is recommended before treating CSP as a strong injection mitigation.
 

@@ -1,48 +1,17 @@
-const {
-  createCipheriv,
-  createDecipheriv,
-  randomBytes,
-  randomUUID,
-} = require("node:crypto");
-const fs = require("node:fs");
+const { randomUUID } = require("node:crypto");
 const path = require("node:path");
 const { z } = require("zod");
 const { context } = require("./security");
+const { createSecretBox } = require("./secret-box");
 const { parseDocument } = require("./parser");
 const graphOrigin = "https://graph.microsoft.com",
   googleOrigin = "https://www.googleapis.com";
 const safeId = z.string().regex(/^[a-zA-Z0-9_!.,:@-]{1,300}$/);
 function createConnectors(app, db, security, save, enqueue, options = {}) {
   const fetcher = options.fetch || fetch;
-  const keyPath = path.join(
+  const { seal, open } = createSecretBox(
     process.env.DATA_DIR || path.join(__dirname, "data"),
-    "integration-key",
   );
-  if (!fs.existsSync(keyPath))
-    fs.writeFileSync(keyPath, randomBytes(32), { mode: 0o600, flag: "wx" });
-  const key = fs.readFileSync(keyPath);
-  if (key.length !== 32) throw Error("Invalid integration encryption key");
-  const seal = (value) => {
-    const iv = randomBytes(12),
-      cipher = createCipheriv("aes-256-gcm", key, iv);
-    return Buffer.concat([
-      iv,
-      cipher.update(JSON.stringify(value)),
-      cipher.final(),
-      cipher.getAuthTag(),
-    ]).toString("base64");
-  };
-  const open = (value) => {
-    const b = Buffer.from(value, "base64"),
-      cipher = createDecipheriv("aes-256-gcm", key, b.subarray(0, 12));
-    cipher.setAuthTag(b.subarray(-16));
-    return JSON.parse(
-      Buffer.concat([
-        cipher.update(b.subarray(12, -16)),
-        cipher.final(),
-      ]).toString(),
-    );
-  };
   db.exec(
     "CREATE TABLE IF NOT EXISTS connectors(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL,name TEXT NOT NULL,provider TEXT NOT NULL,config TEXT NOT NULL,last_sync TEXT,status TEXT NOT NULL); CREATE TABLE IF NOT EXISTS connector_items(connector_id TEXT NOT NULL,remote_id TEXT NOT NULL,document_id TEXT NOT NULL,etag TEXT NOT NULL,PRIMARY KEY(connector_id,remote_id));",
   );

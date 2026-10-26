@@ -197,12 +197,21 @@ const collaboration = require("./collaboration").createCollaboration(
   save,
 );
 require("./drafting").installDraftReview(app, db, save, collaboration);
+const notifications = require("./notifications").createNotifications(
+  app,
+  db,
+  security,
+  {
+    allowPrivateHosts: process.env.ALLOW_PRIVATE_WEBHOOKS === "true",
+    origin: process.env.APP_ORIGIN || "",
+  },
+);
 const workflows = require("./workflows").installWorkflows(
   app,
   db,
   security,
   save,
-  { createReview, createDraft, answer, retrieve },
+  { createReview, createDraft, answer, retrieve, notify: notifications.notify },
 );
 require("./agent-api").installAgentApi(app, db, security, save, {
   retrieve,
@@ -217,6 +226,7 @@ const research = require("./research").installResearch(
   save,
   {
     retainOriginal: (id, bytes, mime) => documentFiles.retain(id, bytes, mime),
+    notify: notifications.notify,
   },
 );
 for (const [route, collection, field] of [
@@ -689,6 +699,7 @@ function start() {
         jobs.close(),
         workflows.close(),
         research.close(),
+        notifications.close(),
       ]);
       server.close(async () => {
         await drained;
@@ -708,5 +719,6 @@ module.exports = {
   createServer,
   collaboration,
   research,
+  notifications,
   start,
 };

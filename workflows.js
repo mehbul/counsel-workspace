@@ -173,12 +173,64 @@ function installWorkflows(app, db, security, save, tools) {
         { code: "APPROVAL_ACCESS_CHANGED" },
       );
   }
+  function notifyRun(run, workspaceId) {
+    if (!tools.notify) return;
+    let matter;
+    try {
+      matter = c().state.matters.find((m) => m.id === run.matterId);
+    } catch {
+      matter = null;
+    }
+    const title = run.name || "Workflow run";
+    const base = {
+      matterId: run.matterId,
+      resourceId: run.id,
+      link: "/",
+    };
+    if (run.status === "waiting_approval")
+      tools.notify({
+        ...base,
+        event: "workflow.approval_required",
+        title: `Approval required: ${title}`,
+        text: `${title} for ${matter?.name || "a matter"} is waiting for approval at step ${run.stepIndex + 1}.`,
+        key: `workflow:${run.id}:approval:${run.stepIndex}:${run.revision}`,
+      });
+    else if (run.status === "completed")
+      tools.notify({
+        ...base,
+        event: "workflow.completed",
+        title: `Workflow completed: ${title}`,
+        text: `${title} for ${matter?.name || "a matter"} completed. Open Workflows to review its outputs.`,
+        key: `workflow:${run.id}:completed:${run.revision}`,
+      });
+    else if (run.status === "cancelled")
+      tools.notify({
+        ...base,
+        event: "workflow.cancelled",
+        title: `Workflow cancelled: ${title}`,
+        text: `${title} for ${matter?.name || "a matter"} was cancelled or rejected.`,
+        key: `workflow:${run.id}:cancelled:${run.revision}`,
+      });
+    else if (run.status === "failed")
+      tools.notify(
+        {
+          ...base,
+          event: "workflow.failed",
+          title: `Workflow failed: ${title}`,
+          text: `${title} for ${matter?.name || "a matter"} failed. ${run.error || "Open Workflows to inspect the failure and retry."}`,
+          key: `workflow:${run.id}:failed:${run.revision}`,
+        },
+        workspaceId,
+      );
+  }
   function putRun(run) {
+    const previous = row("workflow_runs", run.id)?.status;
     run.updated = now();
     const { approvalState, approvalStates, ...saved } = run;
     db.prepare(
       "UPDATE workflow_runs SET data=?,status=? WHERE id=? AND workspace_id=?",
     ).run(JSON.stringify(saved), run.status, run.id, c().workspaceId);
+    if (previous && previous !== run.status) notifyRun(run);
   }
   function templates() {
     return db
@@ -674,6 +726,7 @@ function installWorkflows(app, db, security, save, tools) {
         "failed",
         run.id,
       );
+      notifyRun(run, record.workspace_id);
     } finally {
       working = false;
     }

@@ -33,6 +33,7 @@ const icons = {
   skills: "◇",
   tasks: "☷",
   integrations: "⇄",
+  notifications: "✉",
   activity: "◷",
 };
 async function api(url, body, method = "POST") {
@@ -118,7 +119,10 @@ function render() {
     ["skills", "Skills"],
     ["tasks", "Lists"],
     ...(authState?.user?.role === "owner"
-      ? [["integrations", "Integrations"]]
+      ? [
+          ["notifications", "Notifications"],
+          ["integrations", "Integrations"],
+        ]
       : []),
     ["activity", "Activity"],
   ];
@@ -327,6 +331,15 @@ function content() {
           "Bring approved document sources into a controlled matter.",
           '<button class="primary" onclick="newConnector()">＋ Connect a folder</button>',
         ) + '<div id="connector-list">Loading integrations…</div>'
+      );
+    case "notifications":
+      return (
+        heading(
+          "DELIVERY & RECEIPTS",
+          "Notifications",
+          "Send workflow and monitor alerts to approved channels, with signed delivery and durable retry history.",
+          '<button class="primary" onclick="newNotificationChannel()">＋ Add channel</button>',
+        ) + '<div id="notification-panel">Loading notification channels…</div>'
       );
     case "activity":
       return (
@@ -581,6 +594,7 @@ function bind() {
   if (view === "compare") loadComparisons();
   if (["workflows", "intake", "monitors"].includes(view)) loadWorkflowViews();
   if (view === "integrations") loadConnectors();
+  if (view === "notifications") loadNotifications();
   if (view === "editor" && $("#draft-content")) {
     const drafts = S.drafts.filter((d) => d.matterId === matterId),
       draft = drafts.find((d) => d.id === activeDraft) || drafts[0];
