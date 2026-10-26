@@ -2,7 +2,7 @@
 
 Repository: https://github.com/mehbul/counsel-workspace (private).
 
-Code commit `491be71` passed [GitHub CI run 40299010215](https://github.com/mehbul/counsel-workspace/actions/runs/40299010215) on 26 October 2026. The same 185 tests passed locally. The frontend bundle build, formatting checks, dependency vulnerability audit, Docker image build and hardened-container smoke test passed. Repository scans found no tracked runtime databases, private keys or recognized access-token patterns; this is a bounded check, not an independent security audit.
+Code commit `d732d36` passed [GitHub CI run 40308756855](https://github.com/mehbul/counsel-workspace/actions/runs/40308756855) on 26 October 2026. The same 188 tests passed locally. The frontend bundle build, formatting checks, dependency vulnerability audit, Docker image build and hardened-container smoke test passed. Repository scans found no tracked runtime databases, private keys or recognized access-token patterns; this is a bounded check, not an independent security audit.
 
 ## Verified behavior
 
