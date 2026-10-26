@@ -4,6 +4,17 @@ Repository: https://github.com/mehbul/counsel-workspace.
 
 This record describes the `0.1.0` public preview. The repository was rebuilt from a sanitized history, so older private-repository commit hashes and Actions run IDs do not apply here. The local suite passes 188 tests. The frontend bundle build, formatting checks and dependency vulnerability audit pass locally. The repository's GitHub Actions workflows repeat those checks and add a Docker image build and hardened-container smoke test. Repository scans found no tracked runtime databases, private keys or recognized access-token patterns; this is a bounded check, not an independent security audit.
 
+## Public verification record
+
+On 26 October 2026, commit `c30c12b` passed the public repository checks:
+
+- [Verify run 40315182757](https://github.com/mehbul/counsel-workspace/actions/runs/40315182757): 188 tests, build, format check, benchmark, dependency audit, Docker build and hardened-container smoke test.
+- [CodeQL run 40315182726](https://github.com/mehbul/counsel-workspace/actions/runs/40315182726): JavaScript and TypeScript analysis with the security-extended query set.
+- [Pages deployment 40315246135](https://github.com/mehbul/counsel-workspace/actions/runs/40315246135): the landing page at https://mehbul.github.io/counsel-workspace/.
+- [Container release 40315533549](https://github.com/mehbul/counsel-workspace/actions/runs/40315533549): `ghcr.io/mehbul/counsel-workspace` tags `0.1.0`, `0.1`, `sha-c30c12b` and `latest`.
+
+Tag `v0.1.0` points at this commit. None of these checks is an independent security or legal review.
+
 ## Verified behavior
 
 - Anonymous APIs deny access. Owner setup needs a single-use local token. Password changes and disabled users revoke existing sessions.

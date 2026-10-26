@@ -27,8 +27,9 @@ accurate, or equivalent to a commercial product.
       `PRIVACY.md`, `DISCLAIMER.md`, `CHANGELOG.md`, and `NOTICE`.
 - [x] Issue templates and pull-request template.
 - [x] Dependabot configuration.
-- [ ] Enable GitHub private vulnerability reporting.
-- [ ] Enable GitHub Discussions or document that issues are the support channel.
+- [x] Enable GitHub private vulnerability reporting.
+- [x] Enable GitHub Discussions or document that issues are the support channel.
+- [x] Enable secret scanning, push protection and Dependabot security updates.
 - [ ] Add `good first issue` and `help wanted` labels and seed a few scoped
       issues.
 - [ ] Confirm the Code of Conduct contact route works without exposing personal
@@ -42,17 +43,17 @@ accurate, or equivalent to a commercial product.
 - [x] Matter-archive verifier passes against generated metadata, full, and
       empty-matter archives.
 - [x] Headless browser download accepted by the verifier.
-- [ ] GitHub CI passes on the public repository.
-- [ ] CodeQL analysis completes without unresolved high-severity findings.
+- [x] GitHub CI passes on the public repository.
+- [x] CodeQL analysis completes without unresolved high-severity findings.
 - [ ] Dependency-review workflow runs on a pull request.
-- [ ] Release workflow publishes a container image to GHCR.
-- [ ] GitHub Pages deployment succeeds and the landing page is reachable.
+- [x] Release workflow publishes a container image to GHCR.
+- [x] GitHub Pages deployment succeeds and the landing page is reachable.
 
 ## Release and discoverability
 
-- [ ] Tag `v0.1.0` and publish release notes.
-- [ ] Set the repository description, homepage, and topics.
-- [ ] Confirm the README renders correctly on GitHub, including screenshots and
+- [x] Tag `v0.1.0` and publish release notes.
+- [x] Set the repository description, homepage, and topics.
+- [x] Confirm the README renders correctly on GitHub, including screenshots and
       badges.
 - [ ] Submit the sitemap to Google Search Console after verifying ownership.
 - [ ] Submit to appropriate self-hosted, legal-tech, MCP, and privacy
