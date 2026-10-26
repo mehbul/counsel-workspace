@@ -49,7 +49,9 @@ accurate, or equivalent to a commercial product.
       excluded from analysis and five remaining medium findings were dismissed
       as false positives with written justifications (see
       `docs/VERIFICATION.md`).
-- [ ] Dependency-review workflow runs on a pull request.
+- [x] Dependency-review workflow runs on a pull request. This pull request
+      exercises the pull-request path for the dependency review at the same
+      time as the Verify secret scan, CodeQL and tests.
 - [x] Release workflow publishes a container image to GHCR.
 - [x] GitHub Pages deployment succeeds and the landing page is reachable.
 
