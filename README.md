@@ -31,6 +31,7 @@ For an authenticated shared installation, run `npm start` or use Docker. Team da
 - Reusable instructions, three executable workflow templates, task lists and activity history.
 - Optional independent approval and distinct-reviewer quorum, revalidated before later workflow actions.
 - A guest-only client portal with explicit document and reviewed-text publication and revocation.
+- Owner/editor matter archives with a manifest, SHA-256 checksums, readable source text, structured records, an owner audit subset and optional retained originals; an offline verifier checks the ZIP without extraction.
 - US Federal Register research, official PDF imports and scheduled publication watches.
 - MCP tools for scoped evidence reading and host-authored drafts, review tables and tasks, with expiring/revocable read or write keys.
 - Optional local Ollama or OpenAI-compatible model generation; explicit provider selection prevents accidental API usage.
@@ -57,9 +58,10 @@ npm test
 npm run benchmark
 npm run build
 npm run format:check
+npm run verify:archive -- path/to/archive.zip
 ```
 
-Integration tests use isolated in-memory databases and temporary data directories. They verify import, scoped citations, comparisons, reference checks, source selection, extraction, locks, edits, collaboration, security regressions and DOCX export. See [quality checks and measured limits](docs/QUALITY.md) and the [external CUAD evaluation](docs/LEGAL-EVALUATION.md) for measured results, including the document-disjoint development and validation scores. The validation score is materially below development and is not a Legora comparison.
+Integration tests use isolated in-memory databases and temporary data directories. They verify import, scoped citations, comparisons, reference checks, source selection, extraction, locks, edits, collaboration, security regressions and DOCX export. See [quality checks and measured limits](docs/QUALITY.md) and the [external CUAD evaluation](docs/LEGAL-EVALUATION.md) for measured results, including the document-disjoint development and validation scores. The validation score is materially below development and is not a Legora comparison. Matter-archive layout, access rules, limits and verification are documented in [MATTER-ARCHIVE.md](docs/MATTER-ARCHIVE.md).
 
 ## Self-hosted deployment
 
@@ -67,7 +69,7 @@ See [deployment and operations](docs/OPERATIONS.md) for Docker Compose, HTTPS, i
 
 ## Boundaries
 
-Authentication, workspace isolation, matter grants, local accounts, revocable sessions, owner-managed members, persisted background review/draft jobs and audit records are implemented. This remains a single-instance foundation, not an independently audited production equivalent of Legora. Licensed research, OCR, tenant-installed Word/Outlook add-ins, full DMS permission synchronization, SSO/MFA, comprehensive external monitoring feeds and email notification delivery are still missing. Rich-text Yjs collaboration, comments, checkpoints, DOCX revision export, Microsoft/Google snapshot connectors, an Office task-pane bridge, client portals, in-app document monitors, Federal Register publication watches and signed webhook/Slack/Teams notification delivery are implemented; see docs/COLLABORATION-AND-CONNECTORS.md, docs/OFFICE.md, docs/RESEARCH.md, docs/OPERATIONS.md and docs/WORKFLOW-PARITY.md. Extracted text is stored rather than original-file layout. Review tables still use deterministic passage extraction; generated assistant/draft analysis requires a configured provider. Read the operations document before deployment.
+Authentication, workspace isolation, matter grants, local accounts, revocable sessions, owner-managed members, persisted background review/draft jobs and audit records are implemented. This remains a single-instance foundation, not an independently audited production equivalent of Legora. Licensed research, OCR, tenant-installed Word/Outlook add-ins, full DMS permission synchronization, SSO/MFA, comprehensive external monitoring feeds and email notification delivery are still missing. Rich-text Yjs collaboration, comments, checkpoints, DOCX revision export, Microsoft/Google snapshot connectors, an Office task-pane bridge, client portals, in-app document monitors, Federal Register publication watches, signed webhook/Slack/Teams notification delivery and checksummed matter archives are implemented; see docs/COLLABORATION-AND-CONNECTORS.md, docs/OFFICE.md, docs/RESEARCH.md, docs/MATTER-ARCHIVE.md, docs/OPERATIONS.md and docs/WORKFLOW-PARITY.md. Matter archives are portable exports, not encrypted or signed full-workspace backups, and there is no archive import or restore command. Extracted text is stored rather than original-file layout. Review tables still use deterministic passage extraction; generated assistant/draft analysis requires a configured provider. Read the operations document before deployment.
 
 ## Workflow orchestration
 

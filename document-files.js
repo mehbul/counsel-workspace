@@ -5,7 +5,8 @@ function createDocumentFiles(db, getContext = () => context.getStore()) {
   db.exec(`CREATE TABLE IF NOT EXISTS document_originals (
     workspace_id TEXT NOT NULL, document_id TEXT NOT NULL, matter_id TEXT NOT NULL,
     name TEXT NOT NULL, mime TEXT NOT NULL, sha256 TEXT NOT NULL, bytes BLOB NOT NULL,
-    PRIMARY KEY(workspace_id, document_id))`);
+    PRIMARY KEY(workspace_id, document_id));
+    CREATE INDEX IF NOT EXISTS document_originals_matter ON document_originals(workspace_id, matter_id);`);
   function authorized(id) {
     const c = getContext();
     const d = c?.state?.documents?.find((item) => item.id === id);

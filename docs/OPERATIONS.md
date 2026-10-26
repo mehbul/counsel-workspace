@@ -48,6 +48,22 @@ Restore procedure: stop the app, preserve a recovery copy of its existing data v
 
 Account recovery is an offline host-administrator operation. Stop the app, put the new password in a private file, run `node scripts/reset-password.js user@example.com /private/password-file` with the same `DATA_DIR`, then securely remove the private file and restart. This revokes all sessions for the recovered account. No recovery via unauthenticated web endpoints exists.
 
+## Matter archive exports
+
+Owners and editors can download a single matter as a ZIP from the Documents page or the archive API. Metadata mode contains structured records, readable source text and drafts, referenced workflow skills and an owner audit subset. `?originals=1` adds exact retained original files. The export is scoped to a matter and is not a workspace backup.
+
+Defaults are 128 MiB for the metadata/source-text payload, 128 MiB for retained originals, 4,000 ZIP entries and 10,000 audit rows. Over-limit exports return `413`; a full export with no retained originals returns `400`; an integrity mismatch returns `409`. Viewers and guests cannot export. Revoked matter access and cross-workspace requests return `404`.
+
+`manifest.json` lists payload files with sizes and SHA-256 hashes. `SHA256SUMS` covers every file except itself. The response header `X-Counsel-Archive-SHA256` identifies the complete ZIP. Verify a downloaded archive from a workspace checkout with:
+
+```sh
+npm run verify:archive -- path/to/archive.zip
+```
+
+The verifier checks ZIP bounds, required files, checksum coverage, manifest counts, payload path prefixes, case-insensitive duplicate paths, original mode/counts and audit counts without extracting. Extracted archives can also be checked with `sha256sum -c SHA256SUMS` (or `shasum -a 256 -c SHA256SUMS`). On Windows, use PowerShell `Get-FileHash`; `sha256sum` is not built in.
+
+Archives are not encrypted or signed. Checksums detect changes made without updating `SHA256SUMS`; they do not establish who created or approved an archive. The owner audit subset is best-effort, matched by resource ID, capped and not independently immutable. The export event is written after the ZIP is built and is not included in that same archive. There is no import, restore or merge command. Use the SQLite backup procedure above for workspace recovery. See [MATTER-ARCHIVE.md](MATTER-ARCHIVE.md).
+
 ## Monitoring and upgrades
 
 `/health/live` reports process reachability. `/health/ready` checks SQLite access. Collect container restart count, health failures, disk space, memory and structured error logs. Error logs contain request IDs and error names, not raw documents or passwords. Audit logs are persistent in the database but are not an independently immutable or tamper-evident archive. Host administrators can alter them. Forward them to your trusted log platform if required.
@@ -75,12 +91,13 @@ The container needs outbound HTTPS access to the configured destinations. An HTT
 - Queue a run, restart the app, verify recovery and no duplicate persisted output; simulate provider outage and invalid credentials.
 - Add a notification channel against an approved staging receiver, verify the HMAC signature and event header, force a delivery failure, confirm retry state and manual retry, and confirm receipts remain after channel deletion.
 - Backup and restore to a second volume and compare meaningful application records, including access grants and reviewed cells.
+- Export a matter in metadata and full modes; verify both with `npm run verify:archive`, confirm extracted `SHA256SUMS`, and check viewer/guest denial plus owner-versus-editor audit availability.
 - Run realistic concurrent load tests; measure request latency, queue wait, memory and disk usage against your required workload.
 - Obtain independent security review and legal-domain quality review before sensitive client use.
 
 ## Remaining gaps relative to the requested goal
 
-The application still does not implement Legora's licensed legal-research sources, legal-authority validation, production-grade retrieval quality, OCR, layout-preserving original-document rendering, permissions-preserving DMS synchronization, tenant-wide Office add-in deployment, comprehensive external monitoring feeds, MFA/SSO, email notification delivery, HTTP egress-proxy support, provider spend quotas or independent compliance certification. Office task-pane actions, client portals, rich-text Yjs collaboration, comments, checkpoints, DOCX revision export, in-app document monitors, public Federal Register publication watches and signed webhook/Slack/Teams notification delivery are implemented; their limits are documented in [OFFICE.md](OFFICE.md), [COLLABORATION-AND-CONNECTORS.md](COLLABORATION-AND-CONNECTORS.md), [RESEARCH.md](RESEARCH.md) and [WORKFLOW-PARITY.md](WORKFLOW-PARITY.md). SQLite currently stores each workspace as a JSON record, which limits write throughput and increases memory use as workspaces grow. These are substantial engineering workstreams, not configuration switches. This release must not be represented as full Legora parity.
+The application still does not implement Legora's licensed legal-research sources, legal-authority validation, production-grade retrieval quality, OCR, layout-preserving original-document rendering, permissions-preserving DMS synchronization, tenant-wide Office add-in deployment, comprehensive external monitoring feeds, MFA/SSO, email notification delivery, HTTP egress-proxy support, provider spend quotas, encrypted or signed matter archives, archive import/restore, or independent compliance certification. Office task-pane actions, client portals, rich-text Yjs collaboration, comments, checkpoints, DOCX revision export, in-app document monitors, public Federal Register publication watches, signed webhook/Slack/Teams notification delivery and checksummed matter archives are implemented; their limits are documented in [OFFICE.md](OFFICE.md), [COLLABORATION-AND-CONNECTORS.md](COLLABORATION-AND-CONNECTORS.md), [RESEARCH.md](RESEARCH.md), [MATTER-ARCHIVE.md](MATTER-ARCHIVE.md) and [WORKFLOW-PARITY.md](WORKFLOW-PARITY.md). SQLite currently stores each workspace as a JSON record, which limits write throughput and increases memory use as workspaces grow. These are substantial engineering workstreams, not configuration switches. This release must not be represented as full Legora parity.
 
 The frontend still uses inline event handlers, so its CSP allows inline scripts. All document and user strings are escaped when rendered, and dynamic identifiers are server-generated UUIDs, but eliminating inline handlers is recommended before treating CSP as a strong injection mitigation.
 

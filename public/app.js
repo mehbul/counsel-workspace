@@ -78,6 +78,13 @@ function toast(message) {
   $("#toast").classList.add("show");
   setTimeout(() => $("#toast").classList.remove("show"), 4000);
 }
+function bytesLabel(value) {
+  if (!Number.isFinite(value) || value <= 0) return "0 bytes";
+  if (value >= 1024 * 1024)
+    return `${(value / (1024 * 1024)).toFixed(value >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+  if (value >= 1024) return `${Math.ceil(value / 1024)} KB`;
+  return `${value} bytes`;
+}
 async function refresh() {
   const r = await fetch("/api/state");
   if (r.status === 401) {
@@ -186,7 +193,8 @@ function content() {
           "MATTER DOCUMENTS",
           "Your source of truth.",
           "Import documents and keep analysis grounded.",
-          '<button class="primary" onclick="uploadDocuments()">＋ Upload documents</button>',
+          exportMatterButton() +
+            '<button class="primary" onclick="uploadDocuments()">＋ Upload documents</button>',
         ) +
         `<div class="toolbar">${selector()}<input id="doc-search" placeholder="Search documents…" aria-label="Search documents"><span>${docs().length} current documents</span></div><input id="upload" type="file" multiple hidden accept=".pdf,.docx,.txt,.md,.csv"><div class="uploadzone" onclick="uploadDocuments()"><span>⇧</span><strong>Add documents to ${esc(matter()?.name || "a matter")}</strong><small>PDF, DOCX, TXT, Markdown or CSV · five files, 20 MB each</small></div><div id="document-list">${documentList(docs())}</div>`
       );
@@ -583,6 +591,98 @@ async function send(query, skillId) {
     render();
     $(".conversation")?.scrollTo(0, 999999);
   }
+}
+function exportMatterButton() {
+  return editable()
+    ? '<button class="secondary" onclick="exportMatter()">Export matter</button> '
+    : "";
+}
+async function exportMatter() {
+  if (!matterId) return toast("Create a matter first.");
+  const id = matterId;
+  let data;
+  try {
+    const response = await fetch(`/api/matters/${id}/archive/preview`);
+    data = await response.json().catch(() => ({}));
+    if (!response.ok)
+      throw Error(data.error || "Unable to prepare this matter archive.");
+  } catch (error) {
+    toast(error.message);
+    return;
+  }
+  const metadata = data.metadata || {},
+    full = data.full || {},
+    warnings = data.warnings || [],
+    audit = metadata.audit || {},
+    fullDisabled = !full.available || full.exceedsLimit,
+    originalSize = Math.max(0, (full.bytes || 0) - (metadata.bytes || 0));
+  let fullDescription;
+  if (!full.available)
+    fullDescription =
+      "No retained original files are available for this matter.";
+  else if (full.exceedsLimit)
+    fullDescription = `The originals exceed the ${bytesLabel(data.limits?.originalBytes)} export limit.`;
+  else
+    fullDescription = `${bytesLabel(originalSize)} of originals · ${metadata.originalsRetained} exact file(s) in addition to the metadata and source text.`;
+  const auditDescription = audit.available
+    ? `${metadata.auditRows || 0} owner audit row(s)`
+    : "Owner-only audit unavailable";
+  modal(
+    "Export matter",
+    `<p>Build a portable, checksummed archive of <strong>${esc(data.matter?.name || "this matter")}</strong>. Every file is listed in a manifest and covered by SHA-256 checksums.</p>
+     <div class="archive-summary">
+       <div><strong>${metadata.documents || 0}</strong><small>document versions</small></div>
+       <div><strong>${metadata.drafts || 0}</strong><small>drafts</small></div>
+       <div><strong>${metadata.originalsRetained || 0}</strong><small>retained originals</small></div>
+       <div><strong>${bytesLabel(metadata.bytes || 0)}</strong><small>metadata archive</small></div>
+     </div>
+     <label class="archive-choice"><input type="radio" name="archive-mode" value="metadata" checked><span><strong>Metadata and source text</strong><small>${bytesLabel(metadata.bytes || 0)} · matter records, source text, drafts and ${esc(auditDescription)}. Original files are omitted.</small></span></label>
+     <label class="archive-choice ${fullDisabled ? "disabled" : ""}"><input type="radio" name="archive-mode" value="full" ${fullDisabled ? "disabled" : ""}><span><strong>Full archive with originals</strong><small>${esc(fullDescription)}</small></span></label>
+     ${
+       warnings.length
+         ? `<div class="archive-warning"><strong>Before you export</strong><ul>${warnings.map((warning) => `<li>${esc(warning)}</li>`).join("")}</ul></div>`
+         : ""
+     }
+     <p class="muted">Archives are not encrypted or signed. Store and share them under the matter's confidentiality rules. From a workspace checkout, verify a download with <code>npm run verify:archive -- &lt;archive.zip&gt;</code>; after extraction, use <code>sha256sum -c SHA256SUMS</code>.</p>
+     <div class="modalfooter"><button type="button" class="secondary" onclick="$('#modal').close()">Cancel</button><button class="primary" id="archive-download">Export archive</button></div>`,
+  );
+  $("#archive-download").onclick = async (event) => {
+    const button = event.currentTarget,
+      mode =
+        $('input[name="archive-mode"]:checked')?.value === "full"
+          ? "?originals=1"
+          : "";
+    button.disabled = true;
+    button.textContent = "Building archive…";
+    try {
+      const response = await fetch(`/api/matters/${id}/archive${mode}`);
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({}));
+        throw Error(failure.error || "Archive export failed.");
+      }
+      const blob = await response.blob(),
+        disposition = response.headers.get("content-disposition") || "",
+        filename =
+          /filename="([^"]+)"/.exec(disposition)?.[1] || "matter-archive.zip",
+        objectUrl = URL.createObjectURL(blob),
+        link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+      const hash = response.headers.get("x-counsel-archive-sha256") || "";
+      $("#modal").close();
+      toast(
+        `Exported ${filename}${hash ? ` · SHA-256 ${hash.slice(0, 16)}…` : ""}`,
+      );
+    } catch (error) {
+      toast(error.message);
+      button.disabled = false;
+      button.textContent = "Export archive";
+    }
+  };
 }
 function uploadDocuments() {
   if (!matterId) return toast("Create a matter first.");

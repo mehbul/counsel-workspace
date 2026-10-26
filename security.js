@@ -32,6 +32,7 @@ function installSecurity(app, db, initial) {
     CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password TEXT NOT NULL,workspace_id TEXT NOT NULL,role TEXT NOT NULL,disabled INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,csrf TEXT NOT NULL,expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS audit(id TEXT PRIMARY KEY,workspace_id TEXT,actor TEXT,action TEXT NOT NULL,resource TEXT,created TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS audit_workspace_resource ON audit(workspace_id,resource,created);
     CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS matter_access(user_id TEXT NOT NULL,matter_id TEXT NOT NULL,workspace_id TEXT NOT NULL,PRIMARY KEY(user_id,matter_id));`);
   if (personal) personal.initialize(initial);
