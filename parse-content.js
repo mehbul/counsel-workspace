@@ -1,4 +1,6 @@
-async function extractDocument(buffer, ext) {
+const { ocrStatus, recognizePages } = require("./ocr");
+async function extractDocument(buffer, ext, options = {}) {
+  const ocr = { ...ocrStatus(), needed: false, processedPages: [] };
   let text,
     pages = [];
   if (ext === ".pdf") {
@@ -6,11 +8,24 @@ async function extractDocument(buffer, ext) {
     const parser = new PDFParse({ data: buffer });
     try {
       const result = await parser.getText();
+      const missing = result.pages
+        .filter((page) => !page.text.trim())
+        .map((page) => page.num);
+      ocr.needed = missing.length > 0;
+      const recognized =
+        ocr.enabled && missing.length
+          ? await recognizePages(buffer, missing, options)
+          : new Map();
+      if (recognized.size) {
+        ocr.available = true;
+        ocr.processedPages = [...recognized.keys()];
+        ocr.reason = "Text extracted using local Tesseract OCR.";
+      }
       text = "";
       for (const page of result.pages) {
         if (text) text += "\n\n";
         const start = text.length;
-        text += page.text;
+        text += recognized.has(page.num) ? recognized.get(page.num) : page.text;
         pages.push({ page: page.num, start, end: text.length });
       }
     } finally {
@@ -24,11 +39,7 @@ async function extractDocument(buffer, ext) {
   return {
     text,
     pages,
-    ocr: {
-      available: false,
-      enabled: false,
-      needed: ext === ".pdf" && text.trim().length === 0,
-    },
+    ocr,
   };
 }
 module.exports = { extractDocument };

@@ -714,7 +714,11 @@ test("matter archives restore on a fresh workspace with explicit side-effect and
     comparisonId,
     sourceWorkspace,
     matterId,
-    JSON.stringify({ summary: "No material differences.", matched: ["1"] }),
+    JSON.stringify({
+      summary: "No material differences.",
+      matched: ["1"],
+      documentIds: [documentId],
+    }),
     created,
   );
   db.prepare("INSERT INTO research_watches VALUES(?,?,?,?,?,?,?)").run(
@@ -926,6 +930,10 @@ test("matter archives restore on a fresh workspace with explicit side-effect and
 
   // Role gates on the restore route.
   assert.equal(
+    (await editor.req("matters/archive/restore", new FormData())).status,
+    403,
+  );
+  assert.equal(
     (await viewer.req("matters/archive/restore", new FormData())).status,
     403,
   );
@@ -945,6 +953,13 @@ test("matter archives restore on a fresh workspace with explicit side-effect and
   };
   const tampered = Buffer.concat([sourceArchiveBuffer, Buffer.from("tail")]);
   assert.equal((await sendArchive(editor, tampered)).status, 403);
+  // Unexpected file fields would fail in multer; owners must be checked first.
+  const unexpectedUpload = new FormData();
+  unexpectedUpload.append("unexpected", new Blob(["x"]), "unexpected.zip");
+  assert.equal(
+    (await editor.req("matters/archive/restore", unexpectedUpload)).status,
+    403,
+  );
   assert.equal((await sendArchive(owner, tampered)).status, 400);
   assert.equal(
     (
@@ -955,6 +970,103 @@ test("matter archives restore on a fresh workspace with explicit side-effect and
     401,
   );
 
+  // Fail the final write after auxiliary rows and audit have been inserted.
+  const beforeRestore = db
+    .prepare("SELECT value FROM workspaces WHERE id=?")
+    .get(ownerRow.workspace_id).value;
+  const beforeAudit = db.prepare("SELECT COUNT(*) AS n FROM audit").get().n;
+  const restoredTables = [
+    "document_comparisons",
+    "workflow_templates",
+    "workflow_runs",
+    "workflow_schedules",
+    "legal_operations",
+    "portal_publications",
+    "jobs",
+    "draft_comments",
+    "draft_checkpoints",
+    "draft_suggestions",
+    "research_watches",
+    "document_originals",
+    "audit",
+    "workspaces",
+  ];
+  const databaseSnapshot = () =>
+    restoredTables.map((table) =>
+      db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all(),
+    );
+  const beforeDatabase = databaseSnapshot();
+  db.exec(
+    "CREATE TEMP TRIGGER reject_archive_save BEFORE UPDATE ON workspaces BEGIN SELECT RAISE(ABORT, 'injected archive persistence failure'); END",
+  );
+  try {
+    const failed = await sendArchive(owner, sourceArchiveBuffer);
+    assert.equal(failed.status, 500);
+    assert.deepEqual(databaseSnapshot(), beforeDatabase);
+    assert.equal(
+      db
+        .prepare("SELECT COUNT(*) AS n FROM document_comparisons WHERE id=?")
+        .get(comparisonId).n,
+      0,
+    );
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS n FROM audit").get().n,
+      beforeAudit,
+    );
+    assert.equal(
+      db
+        .prepare("SELECT value FROM workspaces WHERE id=?")
+        .get(ownerRow.workspace_id).value,
+      beforeRestore,
+    );
+  } finally {
+    db.exec("DROP TRIGGER reject_archive_save");
+  }
+  // An exception after persistence must restore the same in-memory objects,
+  // including collection identities, as well as rolling back SQLite writes.
+  const state = JSON.parse(beforeRestore);
+  const fullState = structuredClone(state);
+  const stateCollections = { ...state };
+  const localContext = {
+    state,
+    fullState,
+    role: "owner",
+    workspaceId: ownerRow.workspace_id,
+    actor: ownerRow.id,
+    audit() {},
+  };
+  const injected = createMatterArchive(db, () => localContext, {
+    save() {
+      db.prepare("UPDATE workspaces SET value=? WHERE id=?").run(
+        JSON.stringify(state),
+        ownerRow.workspace_id,
+      );
+      throw Error("injected after persistence");
+    },
+  });
+  assert.throws(
+    () => injected.restore(sourceArchiveBuffer),
+    /injected after persistence/,
+  );
+  assert.equal(localContext.state, state);
+  assert.equal(localContext.fullState, fullState);
+  assert.deepEqual(fullState, JSON.parse(beforeRestore));
+  assert.deepEqual(databaseSnapshot(), beforeDatabase);
+  assert.deepEqual(state, JSON.parse(beforeRestore));
+  for (const [key, value] of Object.entries(stateCollections))
+    assert.equal(state[key], value);
+  assert.equal(
+    db
+      .prepare("SELECT value FROM workspaces WHERE id=?")
+      .get(ownerRow.workspace_id).value,
+    beforeRestore,
+  );
+  assert.equal(
+    db
+      .prepare("SELECT COUNT(*) AS n FROM document_comparisons WHERE id=?")
+      .get(comparisonId).n,
+    0,
+  );
   const restored = await sendArchive(owner, sourceArchiveBuffer);
   assert.equal(restored.status, 200);
   assert.equal(restored.data.matter.id, matterId);
@@ -1099,6 +1211,19 @@ test("matter archives restore on a fresh workspace with explicit side-effect and
       (matter) => matter.id === remapped.data.matter.id,
     );
   assert.ok(remappedMatter);
+  const comparisonCopy = JSON.parse(
+    db
+      .prepare("SELECT data FROM document_comparisons WHERE matter_id=?")
+      .get(remapped.data.matter.id).data,
+  );
+  assert.notEqual(comparisonCopy.documentIds[0], documentId);
+  assert.ok(
+    remappedState.documents.some(
+      (document) =>
+        document.id === comparisonCopy.documentIds[0] &&
+        document.matterId === remapped.data.matter.id,
+    ),
+  );
   assert.equal(
     remappedState.documents.filter(
       (document) => document.matterId === remapped.data.matter.id,

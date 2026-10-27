@@ -117,19 +117,19 @@ and retrieved passages and may charge for use. See
 
 ## What it does
 
-| Area                         | What you get                                                                                                                                                                                                                      |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Matters and documents**    | Persistent matters, PDF/DOCX/TXT/MD/CSV import, original-file retention, page and paragraph anchors, OCR-needed reporting, search, and deletion.                                                                                  |
-| **Review at scale**          | Ranked passage search, deterministic clause anchors, optional semantic candidates, conservative abstention, review tables, evidence inspection, editable findings, locks, status, filtering, sorting, pagination, and CSV export. |
-| **Comparisons and redlines** | Persisted document comparisons, source coverage, highlighted changes, CSV export, DOCX revision export, and tracked insertions through the Office bridge.                                                                         |
-| **Drafting**                 | Rich-text editor, comments, checkpoints, proposed edits with accept/reject, source citations, and real DOCX export.                                                                                                               |
-| **Workflows**                | Versioned templates, ordered steps, selected sources, durable runs, approval gates with independent approvers and quorum, retries, cancellation, and schedules.                                                                   |
-| **Client portal**            | Separate guest accounts, explicit document and reviewed-text publication, selected recipients, matter grants, and immediate revocation.                                                                                           |
-| **Research**                 | US Federal Register and eCFR imports with official-origin pinning, bounded requests, matter-scoped publication watches, deduplicated alerts, and source provenance.                                                               |
-| **Notifications**            | Owner-only encrypted channels for signed webhooks, Slack, and Microsoft Teams; workflow and monitor events; durable retries and receipts.                                                                                         |
+| Area                         | What you get                                                                                                                                                                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Matters and documents**    | Persistent matters, PDF/DOCX/TXT/MD/CSV import, original-file retention, page and paragraph anchors, optional local OCR, search, and deletion.                                                                                           |
+| **Review at scale**          | Ranked passage search, deterministic clause anchors, optional semantic candidates, conservative abstention, review tables, evidence inspection, editable findings, locks, status, filtering, sorting, pagination, and CSV export.        |
+| **Comparisons and redlines** | Persisted document comparisons, source coverage, highlighted changes, CSV export, DOCX revision export, and tracked insertions through the Office bridge.                                                                                |
+| **Drafting**                 | Rich-text editor, comments, checkpoints, proposed edits with accept/reject, source citations, and real DOCX export.                                                                                                                      |
+| **Workflows**                | Versioned templates, ordered steps, selected sources, durable runs, approval gates with independent approvers and quorum, retries, cancellation, and schedules.                                                                          |
+| **Client portal**            | Separate guest accounts, explicit document and reviewed-text publication, selected recipients, matter grants, and immediate revocation.                                                                                                  |
+| **Research**                 | US Federal Register and eCFR imports with official-origin pinning, bounded requests, matter-scoped publication watches, deduplicated alerts, and source provenance.                                                                      |
+| **Notifications**            | Owner-only encrypted channels for signed webhooks, Slack, and Microsoft Teams; workflow and monitor events; durable retries and receipts.                                                                                                |
 | **Matter archives**          | Portable ZIP exports with `manifest.json`, `SHA256SUMS`, readable source text, structured records, a capped owner audit subset, optional retained originals, and an owner-only restore endpoint with an explicit no-side-effects policy. |
-| **Assistants**               | MCP tools for scoped evidence reading and host-authored drafts, review tables, and tasks, with expiring and revocable keys.                                                                                                       |
-| **Deployment**               | Personal mode, native team mode, Docker Compose, hardened-container checks, online backup, and restore guidance.                                                                                                                  |
+| **Assistants**               | MCP tools for scoped evidence reading and host-authored drafts, review tables, and tasks, with expiring and revocable keys.                                                                                                              |
+| **Deployment**               | Personal mode, native team mode, Docker Compose, hardened-container checks, online backup, and restore guidance.                                                                                                                         |
 
 Evidence-only mode uses deterministic clause-level anchors, metadata extraction,
 BM25-style passage ranking, legal-concept aliases, document diversity, exact
@@ -193,7 +193,7 @@ it yourself, Counsel is for you.
 
 ## What it does not do
 
-- No OCR. Scanned PDFs need external OCR first.
+- Scanned PDFs support opt-in local Tesseract/Poppler OCR. See [OCR setup and limits](docs/OCR.md). Review recognized text against the original.
 - No SSO, SCIM, MFA, or enterprise directory integration.
 - No iManage or NetDocuments adapter, provider ACL sync, or ethical-wall mapping.
 - No archive encryption, signature, or notarization. Restore is owner-only;

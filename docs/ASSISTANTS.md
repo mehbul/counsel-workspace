@@ -124,7 +124,7 @@ On 25 October 2026, a live **Codex CLI 0.164.0-alpha.11.1** run using existing C
 
 A separate live local-model check also passed the synthetic account/source/chat path. It is optional: `node scripts/smoke-local-model.js your-installed-model`. No background model service is required for Codex/MCP mode. Legal-quality benchmarks, a specific DeepSeek model, and real Claude client integration remain unverified.
 
-This is a usable assistant-powered workspace, not full Legora parity. Enterprise permission mirroring, client Portal, Office add-ins, licensed research, regulatory feeds and other gaps remain in `WORKFLOW-PARITY.md`.
+This is a usable assistant-powered workspace; full Legora parity has not been established. Client portals, an Office bridge and public regulatory feeds are implemented. Enterprise permission mirroring, live Office/enterprise tenant acceptance, licensed research and comparative legal quality remain gaps; see `WORKFLOW-PARITY.md`.
 
 ## Primary references
 

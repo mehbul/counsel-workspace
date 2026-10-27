@@ -1,6 +1,7 @@
 {$DOMAIN} {
   request_body {
-    max_size 105MB
+    # 256 MiB archive plus multipart overhead; app enforces per-route limits.
+    max_size 257MiB
   }
   reverse_proxy app:3000
 }

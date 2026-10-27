@@ -322,7 +322,9 @@ app.post("/api/documents", upload.array("files", 5), async (req, res, next) => {
       if (!text?.trim()) {
         results.push({
           name: file.originalname,
-          error: "No readable text. Scanned PDFs need OCR before upload.",
+          error: parsed.ocr?.enabled
+            ? "No readable text was found, including after local OCR. Check the scan quality."
+            : "No readable text. Enable local OCR for scanned PDFs; see docs/OCR.md.",
         });
         continue;
       }

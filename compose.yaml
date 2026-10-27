@@ -1,14 +1,18 @@
 services:
   app:
-    build: .
+    image: ${COUNSEL_IMAGE:-counsel-workspace:local}
+    build:
+      context: .
+      args:
+        INSTALL_OCR: ${INSTALL_OCR:-0}
     restart: unless-stopped
     init: true
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       APP_ORIGIN: https://${DOMAIN:?Set DOMAIN in .env}
-      COOKIE_SECURE: 'true'
-      TRUST_PROXY: '1'
+      COOKIE_SECURE: "true"
+      TRUST_PROXY: "1"
       AI_PROVIDER: ${AI_PROVIDER:-evidence}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-}
@@ -17,13 +21,15 @@ services:
       AI_API_KEY: ${AI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      COUNSEL_OCR_ENABLED: ${COUNSEL_OCR_ENABLED:-0}
+      COUNSEL_OCR_LANGUAGE: ${COUNSEL_OCR_LANGUAGE:-eng}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - counsel-data:/data
     read_only: true
     tmpfs:
-      - /tmp:size=64m,mode=1777
+      - /tmp:size=128m,mode=1777
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -39,8 +45,8 @@ services:
     environment:
       DOMAIN: ${DOMAIN}
     ports:
-      - '80:80'
-      - '443:443'
+      - "80:80"
+      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

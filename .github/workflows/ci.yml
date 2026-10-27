@@ -34,9 +34,17 @@ jobs:
       - run: npm run build
       - run: npm run format:check
       - run: npm test
+      - name: Install explicitly enabled local OCR engines
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr poppler-utils
+      - name: Verify scanned PDF extraction and matter search with real engines
+        run: node --test test/ocr.test.js
+        env:
+          COUNSEL_TEST_REAL_OCR: "1"
       - run: npm run benchmark
       - run: npm audit --omit=dev --audit-level=high
       - run: docker compose --env-file .env.example config --quiet
+      - name: Validate production reverse proxy configuration
+        run: docker run --rm -e DOMAIN=staging.example -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - run: docker build -t counsel:test .
       - name: Smoke-test hardened container
         run: |

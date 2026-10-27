@@ -137,7 +137,9 @@ Restores are incremental copies, not overwrites. The restore path verifies the a
 - 400 — the archive failed verification or record validation; nothing was written.
 - 401/403 — not signed in, or not a workspace owner.
 - 409 — an identifier collision without `newIds`, or the restore would exceed the workspace document limit. Includes a hint to retry with `newIds=1`.
-- 413/500 — transport or server errors; nothing was written when the error came from this endpoint's own checks.
+- 413/500 — transport or server errors. Restore writes are atomic: a failure rolls back auxiliary records, retained originals, audit entries and workspace state together.
+
+Owner authorization runs before multipart file buffering. After validation, restore uses a SQLite savepoint for all database writes and restores the original in-memory state and collection identities if persistence fails. A failed restore can therefore be retried without leaving partial records or identifier collisions.
 
 Every record keeps an identifier from the source instance. Records are keyed by globally unique UUIDs, so records from different archives do not collide unless the same archive is restored more than once.
 
