@@ -33,7 +33,7 @@ The browser queues draft generation and review extraction as persisted jobs. The
 
 Each workspace serializes API work and jobs to avoid lost writes to the JSON workspace record. This is intentionally a modest-scale architecture; a long model call can delay other work in that workspace. There are bounded queues and timeouts, but no distributed scheduler, multi-region failover, or full run-cancellation interface.
 
-Document parsing runs in a separate child process with a 30-second deadline and a 192 MiB V8 heap limit. At most two parse processes run concurrently; uploads allow five files of at most 20 MiB each. These controls bound common failures; a child process is not a security sandbox and its V8 limit is not a complete bound on native memory. The container memory limit and staging malicious-file tests remain necessary. Optional local OCR is documented in [OCR.md](OCR.md); it requires explicit image installation and runtime enablement.
+Document parsing runs in a separate child process with a 30-second deadline when OCR is disabled, a 150-second outer deadline when OCR is enabled, and a 192 MiB V8 heap limit. At most two parse processes run concurrently; uploads allow five files of at most 20 MiB each. These controls bound common failures; a child process is not a security sandbox and its V8 limit is not a complete bound on native memory. The container memory limit and staging malicious-file tests remain necessary. Optional local OCR is documented in [OCR.md](OCR.md); it requires explicit image installation and runtime enablement. Enablement alone does not confirm executable or language-data availability; verify both engines under the application account and run the opt-in real-engine check documented there.
 
 ## Backup and recovery
 
