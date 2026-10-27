@@ -897,7 +897,7 @@ function createMatterArchive(
     return value;
   }
 
-  function restore(buffer, settings = {}) {
+  function restoreContext() {
     const c = getContext();
     if (!c) throw fail(500, "Workspace context is unavailable.");
     if (c.role !== "owner")
@@ -905,6 +905,11 @@ function createMatterArchive(
         403,
         "Workspace owner access is required to restore a matter archive.",
       );
+    return c;
+  }
+
+  function restore(buffer, settings = {}) {
+    const c = restoreContext();
     if (!persist) throw fail(500, "Restore persistence is not configured.");
     if (!Buffer.isBuffer(buffer) || !buffer.length)
       throw fail(400, "Send the archive ZIP in the archive field.");
@@ -1368,128 +1373,8 @@ function createMatterArchive(
         `Restoring this archive would exceed the workspace document limit of ${WORKSPACE_DOCUMENT_LIMIT}. Remove documents or restore into a fresh workspace.`,
       );
 
-    // Write everything. The workspace mutation queue serializes this request,
-    // so the collision checks above cannot race other writers.
-    for (const comparison of comparisons)
-      db.prepare("INSERT INTO document_comparisons VALUES(?,?,?,?,?)").run(
-        mapped(comparison.id),
-        c.workspaceId,
-        newMatterId,
-        JSON.stringify(comparison.report),
-        comparison.created,
-      );
-    for (const template of templates)
-      db.prepare("INSERT INTO workflow_templates VALUES(?,?,?,?,?)").run(
-        mapped(template.id),
-        c.workspaceId,
-        JSON.stringify(mapped(template.definition)),
-        template.version,
-        template.updated,
-      );
-    for (const run of runRecords)
-      db.prepare("INSERT INTO workflow_runs VALUES(?,?,?,?,?,?,?,?)").run(
-        mapped(run.id),
-        c.workspaceId,
-        mapped(run.actorId),
-        newMatterId,
-        mapped(run.templateId),
-        run.data,
-        run.status,
-        run.created,
-      );
-    for (const schedule of scheduleRecords)
-      db.prepare(
-        "INSERT INTO workflow_schedules VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-      ).run(
-        mapped(schedule.id),
-        c.workspaceId,
-        mapped(schedule.actorId),
-        newMatterId,
-        mapped(schedule.templateId),
-        schedule.input,
-        schedule.intervalMinutes,
-        schedule.nextAt,
-        0,
-        schedule.lastRunId,
-        schedule.lastError,
-        schedule.created,
-      );
-    for (const operation of operations)
-      db.prepare("INSERT INTO legal_operations VALUES(?,?,?,?,?)").run(
-        mapped(operation.id),
-        c.workspaceId,
-        newMatterId,
-        operation.kind,
-        JSON.stringify(operation.record),
-      );
-    for (const publication of publications)
-      db.prepare(
-        "INSERT INTO portal_publications VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-      ).run(
-        mapped(publication.id),
-        c.workspaceId,
-        newMatterId,
-        publication.title,
-        publication.kind,
-        mapped(publication.documentId),
-        publication.sourceHash,
-        publication.content,
-        JSON.stringify(publication.recipients),
-        publication.created,
-        publication.publisher,
-        publication.revoked ? 1 : 0,
-      );
-    for (const job of jobRecords)
-      db.prepare("INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(
-        mapped(job.id),
-        c.workspaceId,
-        mapped(job.userId),
-        newMatterId,
-        job.kind,
-        job.payload,
-        job.status,
-        job.result,
-        job.error,
-        job.created,
-        job.updated,
-      );
-    for (const comment of comments)
-      db.prepare("INSERT INTO draft_comments VALUES(?,?,?,?,?,?,?)").run(
-        mapped(comment.id),
-        c.workspaceId,
-        mapped(comment.draftId),
-        comment.author,
-        comment.body,
-        comment.resolved ? 1 : 0,
-        comment.created,
-      );
-    for (const checkpoint of checkpoints)
-      db.prepare("INSERT INTO draft_checkpoints VALUES(?,?,?,?,?,?,?)").run(
-        mapped(checkpoint.id),
-        c.workspaceId,
-        mapped(checkpoint.draftId),
-        checkpoint.author,
-        checkpoint.name,
-        checkpoint.content,
-        checkpoint.created,
-      );
-    for (const suggestion of suggestions)
-      db.prepare("INSERT INTO draft_suggestions VALUES(?,?,?,?)").run(
-        mapped(suggestion.id),
-        c.workspaceId,
-        mapped(suggestion.draftId),
-        JSON.stringify(suggestion.suggestion),
-      );
-    for (const watch of watchRecords)
-      db.prepare("INSERT INTO research_watches VALUES(?,?,?,?,?,?,?)").run(
-        mapped(watch.id),
-        c.workspaceId,
-        watch.actorId,
-        newMatterId,
-        watch.data,
-        watch.nextScan,
-        0,
-      );
+    // Validate retained bytes before the first write, even if the ZIP itself
+    // has valid checksums but its originals index disagrees with the payload.
     if (manifest.originalsIncluded)
       for (const original of originals.retained) {
         const bytes = files.get(original.path).data;
@@ -1501,53 +1386,208 @@ function createMatterArchive(
             409,
             "A retained original failed its integrity check. The matter was not restored.",
           );
-        db.prepare("INSERT INTO document_originals VALUES(?,?,?,?,?,?,?)").run(
-          c.workspaceId,
-          mapped(original.documentId),
-          newMatterId,
-          original.name,
-          original.mime,
-          original.sha256,
-          bytes,
-        );
       }
 
-    // State-blob collections. Text lives here, not in separate tables.
-    c.state.matters ||= [];
-    c.state.documents ||= [];
-    c.state.messages ||= [];
-    c.state.reviews ||= [];
-    c.state.drafts ||= [];
-    c.state.tasks ||= [];
-    c.state.skills ||= [];
-    c.state.activity ||= [];
-    c.state.matters.push({ ...mapped(matter) });
-    c.state.skills.push(...skills.map((skill) => ({ ...mapped(skill) })));
-    c.state.documents.push(
-      ...documents.map((document) => ({
-        ...mapped(document),
-        text: sourceText(document),
-      })),
-    );
-    c.state.messages.push(...messages.map((message) => mapped(message)));
-    c.state.reviews.push(...reviews.map((review) => mapped(review)));
-    c.state.drafts.push(
-      ...drafts.map((draft) => ({
-        ...mapped(draft),
-        content: sourceText(draft),
-      })),
-    );
-    c.state.tasks.push(...tasks.map((task) => mapped(task)));
-    c.state.activity = [
-      {
-        id: randomUUID(),
-        action: `Restored matter: ${matter.name}`,
-        date: new Date().toISOString(),
-      },
-      ...c.state.activity,
-    ].slice(0, 100);
-    c.audit(c.workspaceId, c.actor, "matter.archive.restored", newMatterId);
-    persist();
+    // Keep the original state and collection identities on rollback. Restore
+    // only appends records/replaces activity; existing records are untouched.
+    const snapshots = [...new Set([c.state, c.fullState])].map((state) => ({
+      state,
+      properties: { ...state },
+      arrays: Object.values(state)
+        .filter(Array.isArray)
+        .map((array) => [array, array.slice()]),
+    }));
+    db.exec("SAVEPOINT matter_archive_restore");
+    try {
+      for (const comparison of comparisons)
+        db.prepare("INSERT INTO document_comparisons VALUES(?,?,?,?,?)").run(
+          mapped(comparison.id),
+          c.workspaceId,
+          newMatterId,
+          JSON.stringify(mapped(comparison.report)),
+          comparison.created,
+        );
+      for (const template of templates)
+        db.prepare("INSERT INTO workflow_templates VALUES(?,?,?,?,?)").run(
+          mapped(template.id),
+          c.workspaceId,
+          JSON.stringify(mapped(template.definition)),
+          template.version,
+          template.updated,
+        );
+      for (const run of runRecords)
+        db.prepare("INSERT INTO workflow_runs VALUES(?,?,?,?,?,?,?,?)").run(
+          mapped(run.id),
+          c.workspaceId,
+          mapped(run.actorId),
+          newMatterId,
+          mapped(run.templateId),
+          run.data,
+          run.status,
+          run.created,
+        );
+      for (const schedule of scheduleRecords)
+        db.prepare(
+          "INSERT INTO workflow_schedules VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+        ).run(
+          mapped(schedule.id),
+          c.workspaceId,
+          mapped(schedule.actorId),
+          newMatterId,
+          mapped(schedule.templateId),
+          schedule.input,
+          schedule.intervalMinutes,
+          schedule.nextAt,
+          0,
+          schedule.lastRunId,
+          schedule.lastError,
+          schedule.created,
+        );
+      for (const operation of operations)
+        db.prepare("INSERT INTO legal_operations VALUES(?,?,?,?,?)").run(
+          mapped(operation.id),
+          c.workspaceId,
+          newMatterId,
+          operation.kind,
+          JSON.stringify(mapped(operation.record)),
+        );
+      for (const publication of publications)
+        db.prepare(
+          "INSERT INTO portal_publications VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+        ).run(
+          mapped(publication.id),
+          c.workspaceId,
+          newMatterId,
+          publication.title,
+          publication.kind,
+          mapped(publication.documentId),
+          publication.sourceHash,
+          publication.content,
+          JSON.stringify(publication.recipients),
+          publication.created,
+          publication.publisher,
+          publication.revoked ? 1 : 0,
+        );
+      for (const job of jobRecords)
+        db.prepare("INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(
+          mapped(job.id),
+          c.workspaceId,
+          mapped(job.userId),
+          newMatterId,
+          job.kind,
+          job.payload,
+          job.status,
+          job.result,
+          job.error,
+          job.created,
+          job.updated,
+        );
+      for (const comment of comments)
+        db.prepare("INSERT INTO draft_comments VALUES(?,?,?,?,?,?,?)").run(
+          mapped(comment.id),
+          c.workspaceId,
+          mapped(comment.draftId),
+          comment.author,
+          comment.body,
+          comment.resolved ? 1 : 0,
+          comment.created,
+        );
+      for (const checkpoint of checkpoints)
+        db.prepare("INSERT INTO draft_checkpoints VALUES(?,?,?,?,?,?,?)").run(
+          mapped(checkpoint.id),
+          c.workspaceId,
+          mapped(checkpoint.draftId),
+          checkpoint.author,
+          checkpoint.name,
+          checkpoint.content,
+          checkpoint.created,
+        );
+      for (const suggestion of suggestions)
+        db.prepare("INSERT INTO draft_suggestions VALUES(?,?,?,?)").run(
+          mapped(suggestion.id),
+          c.workspaceId,
+          mapped(suggestion.draftId),
+          JSON.stringify(mapped(suggestion.suggestion)),
+        );
+      for (const watch of watchRecords)
+        db.prepare("INSERT INTO research_watches VALUES(?,?,?,?,?,?,?)").run(
+          mapped(watch.id),
+          c.workspaceId,
+          watch.actorId,
+          newMatterId,
+          watch.data,
+          watch.nextScan,
+          0,
+        );
+      if (manifest.originalsIncluded)
+        for (const original of originals.retained) {
+          const bytes = files.get(original.path).data;
+          db.prepare(
+            "INSERT INTO document_originals VALUES(?,?,?,?,?,?,?)",
+          ).run(
+            c.workspaceId,
+            mapped(original.documentId),
+            newMatterId,
+            original.name,
+            original.mime,
+            original.sha256,
+            bytes,
+          );
+        }
+
+      // State-blob collections. Text lives here, not in separate tables.
+      c.state.matters ||= [];
+      c.state.documents ||= [];
+      c.state.messages ||= [];
+      c.state.reviews ||= [];
+      c.state.drafts ||= [];
+      c.state.tasks ||= [];
+      c.state.skills ||= [];
+      c.state.activity ||= [];
+      c.state.matters.push({ ...mapped(matter) });
+      c.state.skills.push(...skills.map((skill) => ({ ...mapped(skill) })));
+      c.state.documents.push(
+        ...documents.map((document) => ({
+          ...mapped(document),
+          text: sourceText(document),
+        })),
+      );
+      c.state.messages.push(...messages.map((message) => mapped(message)));
+      c.state.reviews.push(...reviews.map((review) => mapped(review)));
+      c.state.drafts.push(
+        ...drafts.map((draft) => ({
+          ...mapped(draft),
+          content: sourceText(draft),
+        })),
+      );
+      c.state.tasks.push(...tasks.map((task) => mapped(task)));
+      c.state.activity = [
+        {
+          id: randomUUID(),
+          action: `Restored matter: ${matter.name}`,
+          date: new Date().toISOString(),
+        },
+        ...c.state.activity,
+      ].slice(0, 100);
+      c.audit(c.workspaceId, c.actor, "matter.archive.restored", newMatterId);
+      persist();
+      db.exec("RELEASE SAVEPOINT matter_archive_restore");
+    } catch (error) {
+      try {
+        db.exec("ROLLBACK TO SAVEPOINT matter_archive_restore");
+        db.exec("RELEASE SAVEPOINT matter_archive_restore");
+      } finally {
+        for (const { state, properties, arrays } of snapshots) {
+          for (const key of Object.keys(state)) delete state[key];
+          Object.assign(state, properties);
+          for (const [array, items] of arrays) {
+            array.length = 0;
+            for (const item of items) array.push(item);
+          }
+        }
+      }
+      throw error;
+    }
 
     counts.documents = documents.length;
     counts.messages = messages.length;
@@ -1606,6 +1646,14 @@ function createMatterArchive(
     app.post(
       "/api/matters/archive/restore",
       (req, res, next) => {
+        // Security refreshed the session after acquiring the workspace queue.
+        // Reject non-owners before multer buffers a potentially large archive.
+        try {
+          restoreContext();
+        } catch (error) {
+          if (!reply(res, error)) next(error);
+          return;
+        }
         restoreUpload.single("archive")(req, res, (error) => {
           if (error instanceof multer.MulterError)
             return res

@@ -6,6 +6,8 @@ This release adds a deployable single-instance foundation; it is not independent
 
 ## Deployment
 
+Follow [DEPLOYMENT.md](DEPLOYMENT.md) for the HTTPS topology, proxy trust boundary, optional OCR and public acceptance checks.
+
 Requirements: Docker Engine with Compose v2, a Linux host with encrypted persistent storage, a domain pointing to that host, inbound ports 80 and 443, and enough memory for the application (1 GiB container allowance). Use a supported and patched host. This configuration runs one app replica against a local SQLite volume; do not use network filesystems or scale replicas.
 
 1. Copy `.env.example` to `.env` and set `DOMAIN` to your real hostname. Never commit `.env`. If generated assistance is needed, configure `OPENAI_API_KEY`; only then are retrieved passages transmitted to OpenAI. Organization approval and provider terms must cover the intended documents.
@@ -31,18 +33,34 @@ The browser queues draft generation and review extraction as persisted jobs. The
 
 Each workspace serializes API work and jobs to avoid lost writes to the JSON workspace record. This is intentionally a modest-scale architecture; a long model call can delay other work in that workspace. There are bounded queues and timeouts, but no distributed scheduler, multi-region failover, or full run-cancellation interface.
 
-Document parsing runs in a separate child process with a 30-second deadline and a 192 MiB V8 heap limit. At most two parse processes run concurrently; uploads allow five files of at most 20 MiB each. These controls bound common failures; a child process is not a security sandbox and its V8 limit is not a complete bound on native memory. The container memory limit and staging malicious-file tests remain necessary. OCR is not included.
+Document parsing runs in a separate child process with a 30-second deadline and a 192 MiB V8 heap limit. At most two parse processes run concurrently; uploads allow five files of at most 20 MiB each. These controls bound common failures; a child process is not a security sandbox and its V8 limit is not a complete bound on native memory. The container memory limit and staging malicious-file tests remain necessary. Optional local OCR is documented in [OCR.md](OCR.md); it requires explicit image installation and runtime enablement.
 
 ## Backup and recovery
 
-Use the Node SQLite online backup API. In Docker:
+Use the Node SQLite online backup API. A complete recovery set also includes `/data/integration-key` (connector and notification credentials), `/data/model-key` (saved model profiles, if present), private deployment configuration and the Caddy volumes. Copy keys without displaying their contents; preserve restrictive permissions. Keep keys with the corresponding backup in encrypted off-host storage. Avoid changing provider or integration settings during the snapshot and key-copy window. In Docker:
 
 ```sh
 docker compose exec app mkdir -p /data/backups
 docker compose exec app node scripts/backup.js /data/backups/counsel-2026-10-23.db
 ```
 
+Copy the snapshot and keys into a fresh private local directory, then transfer that complete directory to encrypted off-host storage (commands below run on the Docker host):
+
+```sh
+mkdir -m 700 recovery-2026-10-23
+docker compose cp app:/data/backups/counsel-2026-10-23.db recovery-2026-10-23/workspace.db
+docker compose cp app:/data/integration-key recovery-2026-10-23/integration-key
+# Copy model-key when present; it is required if saved model profiles exist.
+docker compose cp app:/data/model-key recovery-2026-10-23/model-key
+chmod 600 recovery-2026-10-23/*
+node scripts/restore-check.js "$PWD/recovery-2026-10-23/workspace.db" "$PWD/recovery-2026-10-23"
+```
+
+If `model-key` is absent, the copy command fails; verify there are no saved model profiles rather than generating a replacement key. Preserve `.env` separately with the same protection. These commands do not copy Caddy volumes; snapshot those through your host backup system as well. The local Node runtime must support `node:sqlite` (Node 24).
+
 Choose a fresh filename each time. The script never overwrites an existing path and runs `PRAGMA integrity_check` on the result. Copy backups to encrypted, access-controlled storage on another machine. Backups contain account hashes, session records and document content; protect them like the live database. Set a retention period and periodically restore a backup to a separate staging volume.
+
+Before restore, run `node scripts/restore-check.js /absolute/backup.db /absolute/key-directory` with Node 24. The read-only check verifies schema, document references, original hashes, and decryption of connector, notification and model settings without starting workers or contacting providers. It does not prove every application workflow. Restore first into an isolated staging volume with outbound traffic blocked: restored jobs, schedules and notification retries may otherwise execute against real services. Keep the original keys, restore database ownership to the container node user, revoke restored sessions before access, then verify meaningful records and credentials before allowing egress.
 
 Restore procedure: stop the app, preserve a recovery copy of its existing data volume, validate the chosen backup with SQLite integrity checking, replace the stopped database with the backup, and remove only stale WAL/SHM files belonging to that replaced database. Restart, revoke restored sessions, and check users, matter grants, documents, review decisions and exports. Do not run restore against a live process. No destructive restore automation is provided.
 
@@ -87,7 +105,7 @@ The container needs outbound HTTPS access to the configured destinations. An HTT
 - Build image and validate Compose; confirm non-root execution and no directly published app port.
 - Verify HTTPS, redirects, secure cookies and origin behavior through Caddy.
 - Create owner, editor and viewer; prove denied matter access, grant, revoke, logout and disabled-user behavior in separate browsers.
-- Import a representative PDF, DOCX and scanned PDF; verify expected unsupported-OCR behavior and malformed-file failures.
+- Import a representative PDF, DOCX and scanned PDF; verify the selected OCR mode and malformed-file failures.
 - Queue a run, restart the app, verify recovery and no duplicate persisted output; simulate provider outage and invalid credentials.
 - Add a notification channel against an approved staging receiver, verify the HMAC signature and event header, force a delivery failure, confirm retry state and manual retry, and confirm receipts remain after channel deletion.
 - Backup and restore to a second volume and compare meaningful application records, including access grants and reviewed cells.
@@ -97,7 +115,7 @@ The container needs outbound HTTPS access to the configured destinations. An HTT
 
 ## Remaining gaps relative to the requested goal
 
-The application still does not implement Legora's licensed legal-research sources, legal-authority validation, production-grade retrieval quality, OCR, layout-preserving original-document rendering, permissions-preserving DMS synchronization, tenant-wide Office add-in deployment, comprehensive external monitoring feeds, MFA/SSO, email notification delivery, HTTP egress-proxy support, provider spend quotas, encrypted or signed matter archives, archive import/restore, or independent compliance certification. Office task-pane actions, client portals, rich-text Yjs collaboration, comments, checkpoints, DOCX revision export, in-app document monitors, public Federal Register publication watches, signed webhook/Slack/Teams notification delivery and checksummed matter archives are implemented; their limits are documented in [OFFICE.md](OFFICE.md), [COLLABORATION-AND-CONNECTORS.md](COLLABORATION-AND-CONNECTORS.md), [RESEARCH.md](RESEARCH.md), [MATTER-ARCHIVE.md](MATTER-ARCHIVE.md) and [WORKFLOW-PARITY.md](WORKFLOW-PARITY.md). SQLite currently stores each workspace as a JSON record, which limits write throughput and increases memory use as workspaces grow. These are substantial engineering workstreams, not configuration switches. This release must not be represented as full Legora parity.
+The application still does not implement Legora's licensed legal-research sources, legal-authority validation, production-grade retrieval quality, layout-preserving original-document rendering, permissions-preserving DMS synchronization, tenant-wide Office add-in deployment, comprehensive external monitoring feeds, MFA/SSO, email notification delivery, HTTP egress-proxy support, provider spend quotas, encrypted or signed matter archives, or independent compliance certification. Office task-pane actions, client portals, rich-text Yjs collaboration, comments, checkpoints, DOCX revision export, in-app document monitors, public Federal Register publication watches, signed webhook/Slack/Teams notification delivery and checksummed matter archives are implemented; their limits are documented in [OFFICE.md](OFFICE.md), [COLLABORATION-AND-CONNECTORS.md](COLLABORATION-AND-CONNECTORS.md), [RESEARCH.md](RESEARCH.md), [MATTER-ARCHIVE.md](MATTER-ARCHIVE.md) and [WORKFLOW-PARITY.md](WORKFLOW-PARITY.md). SQLite currently stores each workspace as a JSON record, which limits write throughput and increases memory use as workspaces grow. These are substantial engineering workstreams, not configuration switches. This release must not be represented as full Legora parity.
 
 The frontend still uses inline event handlers, so its CSP allows inline scripts. All document and user strings are escaped when rendered, and dynamic identifiers are server-generated UUIDs, but eliminating inline handlers is recommended before treating CSP as a strong injection mitigation.
 

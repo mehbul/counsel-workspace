@@ -120,12 +120,15 @@ function inspectDatabase(filename, options = {}) {
         `${unavailable} documents have no retained original; legacy imports and generated text may lack originals.`,
       );
     const keyDirectory = options.keyDir || path.dirname(filename);
-    for (const [table, keyName, aad] of [
-      ["connectors", "integration-key", false],
-      ["model_settings", "model-key", true],
+    for (const [table, keyName, aad, columns] of [
+      ["connectors", "integration-key", false, ["config"]],
+      ["model_settings", "model-key", true, ["config"]],
+      ["notification_channels", "integration-key", false, ["url", "secret"]],
     ]) {
       if (!tables.has(table)) continue;
-      const rows = db.prepare(`SELECT workspace_id,config FROM ${table}`).all();
+      const rows = db
+        .prepare(`SELECT workspace_id,${columns.join(",")} FROM ${table}`)
+        .all();
       report.counts[table] = rows.length;
       if (!rows.length) continue;
       let valid = true;
@@ -133,20 +136,23 @@ function inspectDatabase(filename, options = {}) {
         const key = fs.readFileSync(path.join(keyDirectory, keyName));
         if (key.length !== 32) throw Error();
         for (const row of rows) {
-          const bytes = Buffer.from(row.config, "base64"),
-            cipher = createDecipheriv(
-              "aes-256-gcm",
-              key,
-              bytes.subarray(0, 12),
+          for (const column of columns) {
+            if (column === "secret" && row[column] === null) continue;
+            const bytes = Buffer.from(row[column], "base64"),
+              cipher = createDecipheriv(
+                "aes-256-gcm",
+                key,
+                bytes.subarray(0, 12),
+              );
+            if (aad) cipher.setAAD(Buffer.from(row.workspace_id));
+            cipher.setAuthTag(bytes.subarray(-16));
+            JSON.parse(
+              Buffer.concat([
+                cipher.update(bytes.subarray(12, -16)),
+                cipher.final(),
+              ]).toString(),
             );
-          if (aad) cipher.setAAD(Buffer.from(row.workspace_id));
-          cipher.setAuthTag(bytes.subarray(-16));
-          JSON.parse(
-            Buffer.concat([
-              cipher.update(bytes.subarray(12, -16)),
-              cipher.final(),
-            ]).toString(),
-          );
+          }
         }
       } catch {
         valid = false;
