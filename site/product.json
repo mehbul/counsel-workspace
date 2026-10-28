@@ -1,7 +1,7 @@
 {
   "name": "Counsel workspace",
-  "version": "0.1.0",
-  "releaseDate": "2026-10-26",
+  "version": "0.2.0",
+  "releaseDate": "2026-10-28",
   "description": "Free, self-hosted legal workspace for contract review, legal research, drafting, workflows and matter collaboration. Apache 2.0. No hosted service, seat fee, telemetry or mandatory model API.",
   "url": "https://mehbul.github.io/counsel-workspace/",
   "source": "https://github.com/mehbul/counsel-workspace",

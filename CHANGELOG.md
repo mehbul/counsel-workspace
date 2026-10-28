@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-28
+
+Opt-in local OCR for scanned PDFs, a hardened owner-only archive restore, and a
+production HTTPS deployment guide with a strict-TLS deployment verifier.
+
 ### Added
 
 - Owner-only matter archive restore (`POST /api/matters/archive/restore`): the
@@ -122,4 +127,5 @@ production-certified or independently audited product.
 - A headless Chromium download of a matter archive was accepted by the offline
   verifier.
 
+[0.2.0]: https://github.com/mehbul/counsel-workspace/releases/tag/v0.2.0
 [0.1.0]: https://github.com/mehbul/counsel-workspace/releases/tag/v0.1.0

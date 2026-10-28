@@ -9,7 +9,7 @@
 Canonical site: https://mehbul.github.io/counsel-workspace/
 Source: https://github.com/mehbul/counsel-workspace
 License: Apache License 2.0
-Version: 0.1.0, first public preview, 26 October 2026
+Version: 0.2.0, 28 October 2026
 
 ## Start here
 

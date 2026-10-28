@@ -47,7 +47,7 @@ redistribute a bundled build, keep the applicable notices and license texts.
 | `cookie-signature@1.2.2` | MIT | [source](https://github.com/visionmedia/node-cookie-signature) |
 | `cookie@0.7.2` | MIT | [source](https://github.com/jshttp/cookie) |
 | `core-util-is@1.0.3` | MIT | [source](https://github.com/isaacs/core-util-is) |
-| `counsel-workspace@0.1.0` | Apache-2.0 | [source](https://github.com/mehbul/counsel-workspace) |
+| `counsel-workspace@0.2.0` | Apache-2.0 | [source](https://github.com/mehbul/counsel-workspace) |
 | `cross-env@10.1.0` | MIT | [source](https://github.com/kentcdodds/cross-env) |
 | `cross-spawn@7.0.6` | MIT | [source](https://github.com/moxystudio/node-cross-spawn) |
 | `debug@4.4.3` | MIT | [source](https://github.com/debug-js/debug) |

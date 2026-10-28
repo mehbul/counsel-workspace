@@ -8,7 +8,7 @@ RUN npm run build
 FROM node:24.20.0-bookworm-slim
 ARG INSTALL_OCR=0
 RUN if [ "$INSTALL_OCR" = "1" ]; then apt-get update && apt-get install -y --no-install-recommends tesseract-ocr poppler-utils && rm -rf /var/lib/apt/lists/*; fi
-ARG VERSION=0.1.0
+ARG VERSION=0.2.0
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Counsel workspace" \
       org.opencontainers.image.description="Free, self-hosted legal workspace for contract review, legal research, drafting, workflows and matter collaboration." \

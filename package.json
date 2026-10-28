@@ -1,6 +1,6 @@
 {
   "name": "counsel-workspace",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Free, self-hosted legal workspace for contract review, legal research, drafting, workflows and matter collaboration. No Legora subscription and no mandatory model API.",
   "main": "server.js",
   "scripts": {
