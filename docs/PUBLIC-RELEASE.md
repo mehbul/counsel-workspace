@@ -64,6 +64,7 @@ accurate, or equivalent to a commercial product.
 ## Release and discoverability
 
 - [x] Tag `v0.1.0` and publish release notes.
+- [x] Tag `v0.2.0` and publish release notes.
 - [x] Set the repository description, homepage, and topics.
 - [x] Confirm the README renders correctly on GitHub, including screenshots and
       badges.
