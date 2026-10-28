@@ -132,7 +132,8 @@ On first run, create the owner with the one-time token in
   answerability balanced accuracy on a document-disjoint CUAD validation split.
   This is not a legal-accuracy guarantee.
 - GitHub Actions runs the test suite, build, format check, dependency audit,
-  Docker build and a hardened-container smoke test.
+  Caddyfile validation, opt-in real-OCR extraction checks, Docker build and a
+  hardened-container smoke test.
 
 ## Licensing and trademark
 
