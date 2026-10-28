@@ -17,6 +17,11 @@ Version: 0.1.0, first public preview, 26 October 2026
   quickstart, feature table, screenshots, comparison, limits and license.
 - [Deployment and operations](https://github.com/mehbul/counsel-workspace/blob/main/docs/OPERATIONS.md):
   Docker Compose, TLS, owner setup, members, matter grants, backup and restore.
+- [HTTPS deployment](https://github.com/mehbul/counsel-workspace/blob/main/docs/DEPLOYMENT.md):
+  the end-to-end TLS recipe, proxy trust boundary, deployment verification
+  command and pre-launch acceptance checklist.
+- [OCR setup and limits](https://github.com/mehbul/counsel-workspace/blob/main/docs/OCR.md):
+  installing Tesseract and Poppler, enabling extraction and its bounds.
 - [Security policy](https://github.com/mehbul/counsel-workspace/blob/main/SECURITY.md):
   reporting, supported versions, security boundaries and residual risk.
 - [Threat model](https://github.com/mehbul/counsel-workspace/blob/main/docs/THREAT-MODEL.md):
@@ -43,7 +48,8 @@ Version: 0.1.0, first public preview, 26 October 2026
   sessions, CSRF and origin checks, rate limits and owner/editor/viewer/guest
   roles.
 - Matters, PDF/DOCX/TXT/MD/CSV import, original-file retention, page and paragraph
-  anchors, and OCR-needed reporting.
+  anchors, and opt-in local OCR for scanned pages when the operator installs
+  Tesseract and Poppler.
 - Matter-scoped ranked passage search, deterministic clause anchors, optional
   semantic candidates and conservative abstention.
 - Review tables with evidence inspection, editable findings, locks, status,
@@ -74,7 +80,8 @@ Version: 0.1.0, first public preview, 26 October 2026
 
 ## What it does not do
 
-- No OCR. Scanned PDFs need external OCR first.
+- No OCR is preinstalled or cloud-based. Scanned PDFs need separately installed
+  local Tesseract and Poppler tools, explicitly enabled by the operator.
 - No SSO, SCIM, MFA or enterprise directory integration.
 - No iManage or NetDocuments adapter, provider ACL sync or ethical-wall mapping.
 - No archive encryption, signature or notarization. Restore is owner-only and

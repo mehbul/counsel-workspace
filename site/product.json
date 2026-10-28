@@ -54,7 +54,7 @@
     "MCP hosts such as Codex and Claude Code"
   ],
   "exclusions": [
-    "No OCR for scanned PDFs",
+    "Scanned PDFs require separately installed local OCR tools (Tesseract and Poppler)",
     "No SSO, SCIM or MFA",
     "No iManage or NetDocuments adapter",
     "No provider ACL or ethical-wall synchronization",
@@ -80,9 +80,9 @@
     "policy": "https://github.com/mehbul/counsel-workspace/blob/main/SECURITY.md"
   },
   "verification": {
-    "testCount": 188,
-    "testCountScope": "v0.1.0 local suite",
-    "ci": "GitHub Actions: tests, build, format check, dependency audit, Docker build and hardened-container smoke test",
+    "testCount": 200,
+    "testCountScope": "current main suite (2026-10-28; two real-OCR checks skip without installed engines)",
+    "ci": "GitHub Actions: tests, build, format check, dependency audit, Caddyfile validation, opt-in real-OCR extraction checks, Docker build and hardened-container smoke test",
     "retrievalBenchmark": {
       "kind": "synthetic regression suite",
       "hitAt3": 1.0,

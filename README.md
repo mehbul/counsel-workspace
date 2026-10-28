@@ -85,8 +85,9 @@ On first run, use the one-time token in `data/bootstrap-token` to create the
 owner account. Put the app behind HTTPS. Tagged releases also publish a
 container image at `ghcr.io/mehbul/counsel-workspace`.
 
-See [deployment and operations](docs/OPERATIONS.md) for TLS, members, matter
-grants, backup/restore, and release gates.
+See [HTTPS deployment](docs/DEPLOYMENT.md) for the end-to-end TLS recipe and
+[deployment and operations](docs/OPERATIONS.md) for members, matter grants,
+backup/restore, and release gates.
 
 ### Native team mode
 

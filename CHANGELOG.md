@@ -8,18 +8,6 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- Opt-in local OCR for scanned PDF pages using Tesseract and Poppler, with
-  bounded processing, preserved native-text pages and exact extracted-text anchors.
-- Production HTTPS deployment guide and a certificate-validating deployment
-  checker; backup checks now verify encrypted notification credentials too.
-
-### Fixed
-
-- Matter archive restores roll back database, audit and in-memory state together
-  on failure. Owner authorization now runs before buffering an archive upload.
-
-### Added
-
 - Owner-only matter archive restore (`POST /api/matters/archive/restore`): the
   offline verification pipeline runs before any write; identifier collisions
   fail closed with `409` unless `newIds=1` requests a remap of every archived
@@ -31,6 +19,15 @@ All notable changes to this project are documented here. The format follows
   the response reports per-record counts plus one warning per policy decision.
   The verifier is now a shared module (`matter-archive-verify.js`) reused by
   the CLI (`npm run verify:archive`) and the restore path.
+- Opt-in local OCR for scanned PDF pages using Tesseract and Poppler, with
+  bounded processing, preserved native-text pages and exact extracted-text anchors.
+- Production HTTPS deployment guide and a certificate-validating deployment
+  checker; backup checks now verify encrypted notification credentials too.
+
+### Fixed
+
+- Matter archive restores roll back database, audit and in-memory state together
+  on failure. Owner authorization now runs before buffering an archive upload.
 
 ### Security
 

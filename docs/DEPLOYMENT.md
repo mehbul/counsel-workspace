@@ -10,6 +10,17 @@ Copy `.env.example` to `.env`, restrict its permissions (`chmod 600 .env`), and 
 
 For optional local OCR, set both `INSTALL_OCR=1` (image build) and `COUNSEL_OCR_ENABLED=1` (runtime), then rebuild. English is the supplied language; additional Tesseract language packs need a custom image. OCR uses the 128 MiB temporary filesystem and still needs representative staging tests. See [OCR.md](OCR.md).
 
+### Environment variables
+
+| Variable | Example | Meaning |
+|---|---|---|
+| `DOMAIN` | `counsel.your-company.example` | Bare hostname without scheme or path. Compose derives `APP_ORIGIN=https://${DOMAIN}` and sets `COOKIE_SECURE=true` and `TRUST_PROXY=1`; do not set those three yourself. |
+| `AI_PROVIDER` | `evidence` | Offline default. `ollama` uses the local runtime; `openai` sends selected source passages to that provider, whose terms and approvals must cover the documents. |
+| `OPENAI_API_KEY`, `OLLAMA_BASE_URL`, `*_MODEL` | `sk-…`, `http://host.docker.internal:11434`, `gpt-4.1-mini` | Optional provider settings; see `.env.example` comments. |
+| `INSTALL_OCR`, `COUNSEL_OCR_ENABLED`, `COUNSEL_OCR_LANGUAGE` | `1`, `1`, `eng` | Optional local OCR build and runtime switches; see [OCR.md](OCR.md). |
+| `COUNSEL_IMAGE` | `ghcr.io/mehbul/counsel-workspace:latest` | Optional image override so `up` pulls a released image instead of building; pin a digest for production. |
+| `COUNSEL_DB` | `/data/workspace.db` | Database location used by the app and the backup/restore scripts; default is `DATA_DIR/workspace.db` (`DATA_DIR=/data` and `PORT=3000` are baked into the image). Point it at a copy of the data when exercising backups, never at the live file from outside the container. |
+
 ```sh
 docker compose config --quiet
 docker compose up --build -d
@@ -36,6 +47,98 @@ After it passes:
 4. Upload representative PDF/DOCX and optional scans; export and restore a test archive; confirm oversized bodies fail safely. Check request latency and memory under your expected concurrency.
 5. Verify client-address-based limits with two independent clients and a forged `X-Forwarded-For` header. The forged header must not bypass the limit or become the trusted client identity.
 6. Perform the backup and isolated restore drill in [OPERATIONS.md](OPERATIONS.md), then record the hostname, date, image revision, results and outstanding failures. Public TLS acceptance remains incomplete until these checks run against the actual hostname.
+
+## nginx alternative
+
+The shipped proxy is Caddy, which CI validates against the real Caddy image. If your environment standardizes on nginx instead, the following reference block mirrors the shipped proxy behavior (TLS termination, one-hop client-IP forwarding, WebSocket upgrades on `/collaboration`, and a body cap above the 256 MiB restore limit). It follows the nginx documentation but has not been executed in this repository's CI; run `nginx -t` on your host before relying on it:
+
+```nginx
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name counsel.your-company.example;
+
+    # Your certificate issuance path, for example certbot:
+    ssl_certificate     /etc/letsencrypt/live/counsel.your-company.example/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/counsel.your-company.example/privkey.pem;
+
+    # Import batches allow five files of 20 MiB each; restores up to 256 MiB.
+    client_max_body_size 270m;
+
+    location /collaboration {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+
+server {
+    listen 80;
+    server_name counsel.your-company.example;
+    return 301 https://$host$request_uri;
+}
+```
+
+With a host-level nginx, remove the `proxy` service from compose and publish the app on loopback only, `ports: ["127.0.0.1:3000:3000"]`. Keep `TRUST_PROXY=1`: nginx is now the single trusted hop, and a CDN or another proxy in front of it would again change the trust boundary and mis-key rate limits. Serve `node scripts/verify-deployment.js https://counsel.your-company.example` afterwards; it requires valid TLS, the HTTP redirect and the anonymous denials regardless of which proxy is in front.
+
+## Backup schedule
+
+Schedule the backup script from the host so it runs even when nobody is signed in. Example systemd units (run `systemd-analyze verify` on your host; the node commands inside were exercised against a workspace checkout locally — see the issue tracker for evidence — but these unit files themselves have not been executed here):
+
+`/usr/local/bin/counsel-backup.sh`:
+
+```sh
+#!/bin/sh
+set -eu
+cd /opt/counsel-workspace        # checkout containing compose.yaml and .env
+stamp=$(date +%Y%m%d-%H%M%S)
+mkdir -p /var/backups/counsel
+docker compose exec -T app mkdir -p /data/backups
+docker compose exec -T app node scripts/backup.js "/data/backups/counsel-$stamp.db"
+docker compose exec -T app node scripts/restore-check.js "/data/backups/counsel-$stamp.db" /data
+docker compose cp "app:/data/backups/counsel-$stamp.db" "/var/backups/counsel/counsel-$stamp.db"
+```
+
+`/etc/systemd/system/counsel-backup.service`:
+
+```ini
+[Unit]
+Description=Counsel workspace online database backup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/counsel-backup.sh
+```
+
+`/etc/systemd/system/counsel-backup.timer`:
+
+```ini
+[Unit]
+Description=Nightly Counsel workspace backup
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable with `chmod +x /usr/local/bin/counsel-backup.sh && systemctl enable --now counsel-backup.timer`, then check `journalctl -u counsel-backup.service` after the first run. A cron equivalent is `15 3 * * * /usr/local/bin/counsel-backup.sh >> /var/log/counsel-backup.log 2>&1`. The timestamped filename is required because the backup script never overwrites an existing path. Copy backups to encrypted, access-controlled storage on another machine (they contain account hashes, sessions and document content), set a retention period, and prune `/data/backups` inside the volume periodically.
 
 ## Recovery essentials
 
