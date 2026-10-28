@@ -28,7 +28,7 @@ function modelConfiguration(env = process.env) {
       provider,
       label: "Model configuration needs attention",
       error:
-        "AI_PROVIDER must be evidence, ollama, openai or openai-compatible.",
+        "AI_PROVIDER must be evidence, ollama, openai, anthropic or openai-compatible.",
     };
   const model =
     provider === "ollama" ? env.OLLAMA_MODEL || env.AI_MODEL : env.AI_MODEL;

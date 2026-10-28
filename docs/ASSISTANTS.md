@@ -1,6 +1,6 @@
 # Use Counsel with your assistant or local model
 
-Counsel requires no Legora account or subscription and no mandatory paid model API. This repository remains private at its owner's request; users need repository access or a legitimately shared copy before installation. The project's existing package license is ISC. Dependencies, models and third-party services retain their own licenses and terms.
+Counsel requires no Legora account or subscription and no mandatory paid model API. The repository is public under the Apache License 2.0; dependencies, models and third-party services retain their own licenses and terms.
 
 ## Choose a reasoning mode
 

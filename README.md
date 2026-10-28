@@ -15,7 +15,7 @@ server. No Legora subscription, per-seat fee, telemetry, or mandatory model API.
 
 [Quickstart](#quickstart) · [Features](#what-it-does) · [Screenshots](#screenshots) · [How it compares](#how-it-compares) · [Documentation](docs/) · [Website](https://mehbul.github.io/counsel-workspace/)
 
-> **0.1 public preview.** Useful and tested, but not independently audited, not
+> **0.2 public preview.** Useful and tested, but not independently audited, not
 > legal advice, and not a claim of legal accuracy or Legora equivalence. Read the
 > [disclaimer](DISCLAIMER.md), [security policy](SECURITY.md), and
 > [known limits](#what-it-does-not-do) before putting client material in it.
@@ -112,8 +112,14 @@ OLLAMA_BASE_URL=http://127.0.0.1:11434
 
 For an OpenAI-compatible endpoint, set `AI_PROVIDER=openai-compatible`,
 `AI_BASE_URL`, `AI_MODEL`, and `AI_API_KEY`. For the native OpenAI path, set
-`AI_PROVIDER=openai` and `OPENAI_API_KEY`. Cloud providers receive the question
-and retrieved passages and may charge for use. See
+`AI_PROVIDER=openai` and `OPENAI_API_KEY`. For Anthropic's Claude models, set
+`AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`,
+default `claude-sonnet-4-6`). Owners can also save provider profiles in the
+app's model settings; credentials are encrypted at rest. A subscription login
+such as ChatGPT Plus or Claude Pro is used directly when you connect the
+assistant through MCP (see below); in-app generation uses provider API keys,
+which are billed separately by the provider. Cloud providers receive the
+question and retrieved passages and may charge for use. See
 [assistant and model setup](docs/ASSISTANTS.md).
 
 ## What it does
