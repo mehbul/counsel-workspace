@@ -1,11 +1,11 @@
-FROM node:24.20.0-bookworm-slim AS build
+FROM node:26.13.0-bookworm-slim AS build
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY client ./client
 RUN npm run build
 
-FROM node:24.20.0-bookworm-slim
+FROM node:26.13.0-bookworm-slim
 ARG INSTALL_OCR=0
 RUN if [ "$INSTALL_OCR" = "1" ]; then apt-get update && apt-get install -y --no-install-recommends tesseract-ocr poppler-utils && rm -rf /var/lib/apt/lists/*; fi
 ARG VERSION=0.2.0
